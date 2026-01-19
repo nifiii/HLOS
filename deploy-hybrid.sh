@@ -166,17 +166,18 @@ echo ""
 echo "🌐 配置 Nginx..."
 
 # 备份旧配置
-if [ -f "$NGINX_CONF_DIR/hl-os.conf" ]; then
-    cp $NGINX_CONF_DIR/hl-os.conf $NGINX_CONF_DIR/hl-os.conf.bak.$(date +%s)
+if [ -f "$NGINX_CONF_DIR/home.conf" ]; then
+    cp $NGINX_CONF_DIR/home.conf $NGINX_CONF_DIR/home.conf.bak.$(date +%s)
+    echo "   已备份旧配置"
 fi
 
 # 复制新配置
-cp deployment/hl-os.nginx.conf $NGINX_CONF_DIR/hl-os.conf
-cp deployment/hl-os-locations.nginx.conf $NGINX_CONF_DIR/hl-os-locations.conf
+cp deployment/home.conf $NGINX_CONF_DIR/home.conf
 
 # 测试配置
 nginx -t || {
     echo -e "${RED}❌ Nginx 配置测试失败${NC}"
+    echo "查看配置: cat $NGINX_CONF_DIR/home.conf"
     exit 1
 }
 
@@ -184,6 +185,8 @@ nginx -t || {
 systemctl reload nginx
 
 echo -e "${GREEN}✅ Nginx 配置完成${NC}"
+echo "   配置文件: $NGINX_CONF_DIR/home.conf"
+echo "   域名: home.haokuai.uk"
 echo ""
 
 # ================================
@@ -245,9 +248,10 @@ echo "   后端:          systemd (hl-backend.service)"
 echo "   AnythingLLM:   Docker 容器"
 echo ""
 echo "📍 访问地址:"
-echo "   前端:          http://$(hostname -I | awk '{print $1}')"
-echo "   后端 API:      http://$(hostname -I | awk '{print $1}')/api/"
-echo "   健康检查:      http://$(hostname -I | awk '{print $1}')/health"
+echo "   前端:          http://home.haokuai.uk"
+echo "   后端 API:      http://home.haokuai.uk/api/"
+echo "   健康检查:      http://home.haokuai.uk/health"
+echo "   本地测试:      http://$(hostname -I | awk '{print $1}')"
 echo ""
 echo "📊 管理命令:"
 echo "   后端日志:      journalctl -u hl-backend -f"
