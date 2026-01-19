@@ -1,5 +1,5 @@
 import pdfParse from 'pdf-parse';
-import { ChapterNode } from '../../../types';
+import { ChapterNode } from '../types';
 
 interface PDFParseResult {
   text: string;

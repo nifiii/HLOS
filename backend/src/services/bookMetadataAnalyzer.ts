@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from '@google/genai';
-import { ChapterNode } from '../../../types';
+import { ChapterNode } from '../types';
 
 const apiKey = process.env.GEMINI_API_KEY;
 

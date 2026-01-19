@@ -4,7 +4,7 @@
     "module": "ESNext",
     "lib": ["ES2020"],
     "moduleResolution": "node",
-    "rootDir": "..",
+    "rootDir": "./src",
     "outDir": "./dist",
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
@@ -13,6 +13,6 @@
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true
   },
-  "include": ["src/**/*", "../types.ts"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }

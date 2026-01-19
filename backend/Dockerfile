@@ -12,12 +12,9 @@ COPY backend/package*.json ./
 RUN npm config set registry https://registry.npmmirror.com && \
     npm install
 
-# 复制源代码
+# 复制源代码（包含 types.ts）
 COPY backend/src ./src
 COPY backend/tsconfig.json ./
-
-# 复制共享类型定义（项目根目录）
-COPY types.ts ../types.ts
 
 # 执行 TypeScript 编译
 RUN npm run build

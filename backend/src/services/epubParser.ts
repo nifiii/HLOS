@@ -1,5 +1,5 @@
 import EPub from 'epub2';
-import { ChapterNode } from '../../../types';
+import { ChapterNode } from '../types';
 import { BookParseResult } from './pdfParser';
 
 /**
