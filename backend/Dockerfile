@@ -6,15 +6,18 @@ FROM node:20-alpine AS backend-builder
 WORKDIR /app
 
 # 复制 package.json 和 package-lock.json
-COPY package*.json ./
+COPY backend/package*.json ./
 
 # 安装依赖（包括 devDependencies 用于构建）
 RUN npm config set registry https://registry.npmmirror.com && \
     npm install
 
 # 复制源代码
-COPY src ./src
-COPY tsconfig.json ./
+COPY backend/src ./src
+COPY backend/tsconfig.json ./
+
+# 复制共享类型定义（项目根目录）
+COPY types.ts ../types.ts
 
 # 执行 TypeScript 编译
 RUN npm run build
@@ -31,7 +34,7 @@ FROM node:20-alpine AS production
 WORKDIR /app
 
 # 只复制 package.json 和 package-lock.json
-COPY package*.json ./
+COPY backend/package*.json ./
 
 # 仅安装生产依赖
 RUN npm config set registry https://registry.npmmirror.com && \

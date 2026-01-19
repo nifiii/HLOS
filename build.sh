@@ -66,11 +66,12 @@ echo "📦 开始构建后端..."
 echo "--------------------------------"
 
 # 构建后端镜像（仅构建阶段）
+# 注意：构建上下文是项目根目录，以便访问 types.ts
 docker build \
   --target backend-builder \
   --tag ${BACKEND_IMAGE}:latest \
   --file backend/Dockerfile \
-  backend/ || {
+  . || {
     echo -e "${RED}❌ 后端构建失败${NC}"
     exit 1
   }
