@@ -83,691 +83,441 @@
 ├─────────────────────────────────────────────────────────────┤
 │  ┌─────────────┐  ┌──────────────┐  ┌─────────────────┐    │
 │  │   Nginx     │→ │   Backend    │→ │  AnythingLLM    │    │
-│  │  (Port 80)  │  │  (Port 3000) │  │  (Port 3001)    │    │
-│  │             │  │              │  │                 │    │
-│  │  静态文件   │  │  Express.js  │  │  向量数据库     │    │
-│  │  反向代理   │  │  API 路由    │  │  RAG 检索       │    │
+│  │   (80/443)  │  │   (3000)     │  │    (3001)       │    │
+│  │   反向代理   │  │  Express API │  │   向量数据库     │    │
 │  └─────────────┘  └──────────────┘  └─────────────────┘    │
-│         │                 │                   │              │
-│         └─────────────────┴───────────────────┘              │
-│                    Docker Compose                            │
+│         ↓                ↓                     ↓            │
+│  ┌─────────────┐  ┌──────────────┐  ┌─────────────────┐    │
+│  │  React 前端  │  │ Gemini API   │  │   LanceDB       │    │
+│  │  (静态文件)  │  │  (AI引擎)    │  │  (向量存储)      │    │
+│  └─────────────┘  └──────────────┘  └─────────────────┘    │
 └─────────────────────────────────────────────────────────────┘
-                            ↓
-                     Google Gemini API
-                   (AI 推理 / OCR / 课件生成)
 ```
 
 ### 技术栈
 
-**前端**:
-- React 18 + TypeScript
-- Tailwind CSS (Utility-first)
-- Lucide React (图标库)
-- React Markdown (Markdown 渲染)
-- IndexedDB (本地数据存储)
-- Vite (构建工具)
+#### 前端
+- **框架**: React 18 + TypeScript
+- **构建工具**: Vite 5.0
+- **样式**: Tailwind CSS (Utility-first)
+- **图标**: Lucide React
+- **存储**: IndexedDB (图书、用户数据本地缓存)
 
-**后端**:
-- Node.js 18+ + Express.js
-- TypeScript (类型安全)
-- Multer (文件上传)
-- PDF-Parse (PDF 解析)
-- EPUB2 (EPUB 解析)
-- Google GenAI SDK (Gemini 3 集成)
+#### 后端
+- **运行时**: Node.js 20 + Express
+- **AI SDK**: Google GenAI (`@google/genai`)
+- **文件解析**:
+  - `pdf-parse` - PDF 解析
+  - `epub2` - EPUB 解析
+  - `multer` - 文件上传
+- **日志**: Winston
 
-**AI 引擎**:
-- Google Gemini 3 Flash (OCR / 元数据提取)
-- Google Gemini 3 Pro (课件生成 / 测验生成)
-- AnythingLLM (向量化 / RAG 检索)
+#### AI & 向量数据库
+- **LLM**: Google Gemini 3 (Flash + Pro)
+- **向量化引擎**: Gemini Embedding (`text-embedding-004`)
+- **RAG 平台**: AnythingLLM (开源)
+- **向量存储**: LanceDB
 
-**基础设施**:
-- Docker + Docker Compose
-- Nginx (反向代理 + 静态文件服务)
-- LanceDB (向量数据库)
-
----
-
-## 🚀 云服务器部署指南
-
-### 一、服务器要求
-
-**最低配置**:
-- CPU: 2核
-- 内存: 4GB
-- 硬盘: 20GB SSD
-- 操作系统: Ubuntu 20.04+ / CentOS 7+
-
-**推荐配置**:
-- CPU: 4核
-- 内存: 8GB
-- 硬盘: 40GB SSD
-
-**必须安装**:
-- Docker
-- Docker Compose
-- Git
+#### 部署
+- **容器化**: Docker + Docker Compose
+- **反向代理**: Nginx (Alpine)
+- **目标环境**: CentOS 8.2, 2核4G, 50GB 硬盘
 
 ---
 
-### 二、快速部署（一键部署）
+## 🚀 快速开始
 
-#### 步骤 1: 服务器准备
+### 前置要求
 
+- **操作系统**: CentOS 8.2 或其他 Linux 发行版
+- **硬件配置**: 最低 2 核 4GB 内存，推荐 50GB 磁盘空间
+- **软件依赖**:
+  - Docker >= 20.10
+  - Docker Compose >= 2.0
+  - Git
+- **API Key**: Google Gemini API Key (申请地址: [Google AI Studio](https://aistudio.google.com/))
+
+### 一键部署
+
+**步骤 1: 克隆代码**
 ```bash
-# 更新系统
-sudo apt update && sudo apt upgrade -y
-
-# 安装 Docker
-curl -fsSL https://get.docker.com | bash
-
-# 安装 Docker Compose
-sudo apt install docker-compose -y
-
-# 启动 Docker
-sudo systemctl start docker
-sudo systemctl enable docker
-
-# 将当前用户加入 docker 组（可选，避免每次使用 sudo）
-sudo usermod -aG docker $USER
-# 注销并重新登录生效
-```
-
-#### 步骤 2: 克隆代码
-
-```bash
-# SSH 克隆
-git clone git@github.com:your-username/home-learning-os.git
-
-# 或 HTTPS 克隆
-git clone https://github.com/your-username/home-learning-os.git
-
+git clone <repository-url>
 cd home-learning-os
 ```
 
-#### 步骤 3: 配置环境变量
-
+**步骤 2: 配置环境变量**
 ```bash
 # 复制环境变量模板
 cp .env.example .env
 
-# 编辑配置文件
+# 编辑 .env 文件,填入你的 API Key
 nano .env
-
-# 填写以下信息：
-# GEMINI_API_KEY=your_actual_gemini_key
-# ANYTHINGLLM_API_KEY=$(openssl rand -hex 32)
 ```
 
-**GEMINI_API_KEY 申请**:
-1. 访问 [Google AI Studio](https://aistudio.google.com/)
-2. 登录 Google 账号
-3. 点击「Get API Key」
-4. 创建新项目或选择现有项目
-5. 复制生成的 API Key
-
-**ANYTHINGLLM_API_KEY 生成**:
+`.env` 文件示例:
 ```bash
-openssl rand -hex 32
+# Google Gemini API Key (必需)
+GEMINI_API_KEY=your_google_gemini_api_key_here
+
+# AnythingLLM API Key (自动生成,可自定义)
+# 生成方式: openssl rand -hex 32
+ANYTHINGLLM_API_KEY=your_anythingllm_api_key_here
+
+# 环境模式
+NODE_ENV=production
 ```
 
-#### 步骤 4: 执行部署
-
+**步骤 3: 执行部署脚本**
 ```bash
-# 给部署脚本执行权限
+# 赋予执行权限
 chmod +x deploy.sh
 
-# 执行一键部署
+# 运行一键部署
 ./deploy.sh
 ```
 
 部署脚本会自动：
-1. 检查环境配置
-2. 构建前端代码
+1. 构建前端静态文件
+2. 安装后端依赖
 3. 启动 Docker 容器（Nginx + Backend + AnythingLLM）
 4. 执行健康检查
 
-**部署时间**: 约 5-10 分钟（取决于网络速度）
+**步骤 4: 访问应用**
 
-#### 步骤 5: 验证部署
-
-访问以下地址检查服务状态：
-
-- **前端**: `http://your-server-ip`
-- **后端健康检查**: `http://your-server-ip/api/health`
-- **AnythingLLM 管理界面**: `http://your-server-ip:3001`
-
-**预期响应**:
-```json
-// http://your-server-ip/api/health
-{
-  "status": "ok",
-  "timestamp": 1737292800000,
-  "version": "1.0.0"
-}
-```
+部署成功后，在浏览器访问:
+- **前端**: http://your-server-ip
+- **后端健康检查**: http://your-server-ip/api/health
+- **AnythingLLM 管理界面**: http://your-server-ip:3001
 
 ---
 
-### 三、防火墙配置
+## 📖 详细使用说明
 
-```bash
-# Ubuntu/Debian
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
-sudo ufw enable
-sudo ufw status
+### 📱 移动端使用
 
-# CentOS/RHEL
-sudo firewall-cmd --permanent --add-service=http
-sudo firewall-cmd --permanent --add-service=https
-sudo firewall-cmd --reload
-```
+1. **添加到主屏幕** (iOS/Android):
+   - iOS: Safari → 分享 → 添加到主屏幕
+   - Android: Chrome → 菜单 → 添加到主屏幕
+
+2. **切换学生身份**:
+   - 点击顶部头像图标
+   - 选择大宝/二宝
+
+3. **拍题录入**:
+   - 进入"拍题"模块
+   - 点击"拍照"或"上传图片"
+   - 等待 AI 识别完成
+   - 确认信息后归档
+
+### 📚 图书馆使用
+
+1. **上传电子书**:
+   - 进入"图书馆"模块
+   - 点击"上传图书"按钮
+   - 选择 PDF/EPUB/TXT 文件
+   - 等待 AI 自动提取元数据
+   - 确认/编辑元数据后保存
+
+2. **浏览图书**:
+   - 使用筛选器按学科/类别/年级筛选
+   - 点击图书卡片查看详情
+   - 查看章节目录树
+
+### 🌱 学习园地使用
+
+1. **选择章节**:
+   - 进入"学习园地"模块
+   - 从图书列表选择教材
+   - 在三级目录树中选择具体章节
+
+2. **生成课件**:
+   - 选择教学风格（严谨/故事化/实践/探究）
+   - 点击"生成课件"
+   - AI 会结合教材内容 + 你的历史错题生成个性化课件
+
+3. **完成测验**:
+   - 课件学习完成后，点击"生成配套测验"
+   - AI 会生成针对该章节的测验题
+
+### 🎯 考场使用
+
+1. **生成试卷**:
+   - 进入"考场"模块
+   - 选择科目（如数学）
+   - 输入复习重点（如"二次函数"）
+   - AI 会基于你的历史错题生成试卷
+
+2. **下载试卷**:
+   - 试卷生成后，支持 Markdown 格式下载
+   - 可直接打印或导入 Obsidian
 
 ---
 
-### 四、常用运维命令
+## 🛠 系统维护
 
-#### 查看服务状态
+### Docker 容器管理
 
 ```bash
-# 查看所有容器状态
+# 查看容器状态
 docker-compose ps
 
-# 查看资源使用情况
-docker stats
-```
+# 查看日志
+docker-compose logs -f          # 全部服务
+docker-compose logs -f backend  # 仅后端
+docker-compose logs -f nginx    # 仅 Nginx
 
-#### 查看日志
-
-```bash
-# 查看所有服务日志
-docker-compose logs -f
-
-# 查看特定服务日志
-docker-compose logs -f backend
-docker-compose logs -f anythingllm
-docker-compose logs -f nginx
-
-# 查看最近 100 行日志
-docker-compose logs --tail=100 backend
-```
-
-#### 重启服务
-
-```bash
-# 重启所有服务
+# 重启服务
 docker-compose restart
 
-# 重启特定服务
-docker-compose restart backend
-docker-compose restart anythingllm
-```
-
-#### 停止服务
-
-```bash
-# 停止所有服务
+# 停止服务
 docker-compose down
 
-# 停止并删除卷（清空数据）
-docker-compose down -v
-```
-
-#### 更新代码并重新部署
-
-```bash
-# 拉取最新代码
+# 更新代码后重新部署
 git pull
-
-# 重新部署
 ./deploy.sh
 ```
 
----
-
-### 五、性能优化（2核4G 服务器）
-
-#### 1. 启用 Swap 内存
+### 数据备份
 
 ```bash
-# 创建 2G swap 文件
-sudo fallocate -l 2G /swapfile
-sudo chmod 600 /swapfile
-sudo mkswap /swapfile
-sudo swapon /swapfile
+# 备份 AnythingLLM 数据
+tar -czf anythingllm-backup-$(date +%Y%m%d).tar.gz ./anythingllm-storage
 
-# 永久生效
-echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
-
-# 验证
-free -h
+# 备份前端 IndexedDB 数据（需在浏览器导出）
+# 进入"设置" → "导出数据"
 ```
 
-#### 2. 定期清理 Docker
+### 性能优化 (2核4G服务器)
 
-```bash
-# 手动清理未使用的镜像、容器、网络
-docker system prune -af
+项目已针对 2核4G 服务器进行优化:
 
-# 添加到 crontab（每周日凌晨2点执行）
-(crontab -l 2>/dev/null; echo "0 2 * * 0 docker system prune -af") | crontab -
-```
+1. **AnythingLLM 内存限制**:
+   - 最大内存: 2GB
+   - 预留内存: 1GB
 
-#### 3. 监控内存使用
+2. **分块策略**:
+   - Chunk Size: 800 tokens
+   - Chunk Overlap: 150 tokens
+   - 并发分块数: 2
 
-```bash
-# 查看内存使用
-free -h
+3. **Nginx 缓存**:
+   - 静态资源缓存 1 年
+   - HTML 不缓存（实时更新）
 
-# 查看 Docker 容器资源使用
-docker stats --no-stream
+### 故障排查
 
-# 持续监控
-watch -n 5 docker stats --no-stream
-```
+| 问题 | 原因 | 解决方案 |
+|------|------|----------|
+| 容器启动失败 | 端口占用 | `sudo lsof -i :80` 检查端口，停止冲突进程 |
+| 后端健康检查失败 | API Key 未配置 | 检查 `.env` 文件是否包含 `GEMINI_API_KEY` |
+| AnythingLLM 无法访问 | 容器未启动 | `docker-compose logs anythingllm` 查看日志 |
+| 图像识别超时 | 图片过大 | 压缩图片至 5MB 以下 |
+| 内存不足 | 并发请求过多 | 调整 `docker-compose.yml` 中的内存限制 |
 
 ---
 
-### 六、配置 HTTPS（可选但推荐）
+## 📁 项目结构
 
-使用 Let's Encrypt 免费 SSL 证书：
-
-```bash
-# 1. 安装 certbot
-sudo apt install certbot
-
-# 2. 停止 Nginx 容器
-docker-compose stop nginx
-
-# 3. 生成证书（替换 your-domain.com 为你的域名）
-sudo certbot certonly --standalone -d your-domain.com
-
-# 4. 证书位置
-# /etc/letsencrypt/live/your-domain.com/fullchain.pem
-# /etc/letsencrypt/live/your-domain.com/privkey.pem
-
-# 5. 复制证书到项目目录
-mkdir -p ssl
-sudo cp /etc/letsencrypt/live/your-domain.com/fullchain.pem ssl/cert.pem
-sudo cp /etc/letsencrypt/live/your-domain.com/privkey.pem ssl/key.pem
-sudo chown $USER:$USER ssl/*
-
-# 6. 修改 nginx.conf 启用 HTTPS 配置（取消 443 端口配置的注释）
-
-# 7. 重启服务
-docker-compose up -d
-
-# 8. 配置自动续期
-sudo certbot renew --dry-run
-(crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet && docker-compose restart nginx") | crontab -
 ```
-
----
-
-### 七、数据备份与恢复
-
-#### 备份 AnythingLLM 数据
-
-```bash
-# 1. 停止服务
-docker-compose stop anythingllm
-
-# 2. 备份存储目录
-tar -czf anythingllm-backup-$(date +%Y%m%d-%H%M%S).tar.gz anythingllm-storage/
-
-# 3. 重启服务
-docker-compose start anythingllm
-
-# 4. 将备份文件传输到安全位置
-scp anythingllm-backup-*.tar.gz user@backup-server:/backups/
-```
-
-#### 恢复备份
-
-```bash
-# 1. 停止服务
-docker-compose stop anythingllm
-
-# 2. 删除旧数据（谨慎操作）
-rm -rf anythingllm-storage/*
-
-# 3. 解压备份
-tar -xzf anythingllm-backup-YYYYMMDD-HHMMSS.tar.gz
-
-# 4. 重启服务
-docker-compose start anythingllm
-```
-
-#### 定期备份脚本
-
-```bash
-# 创建备份脚本
-cat > backup.sh << 'EOF'
-#!/bin/bash
-BACKUP_DIR="/backups/home-learning-os"
-DATE=$(date +%Y%m%d-%H%M%S)
-
-mkdir -p $BACKUP_DIR
-docker-compose stop anythingllm
-tar -czf $BACKUP_DIR/anythingllm-$DATE.tar.gz anythingllm-storage/
-docker-compose start anythingllm
-
-# 删除 30 天前的备份
-find $BACKUP_DIR -name "anythingllm-*.tar.gz" -mtime +30 -delete
-EOF
-
-chmod +x backup.sh
-
-# 添加到 crontab（每天凌晨 2 点执行）
-(crontab -l 2>/dev/null; echo "0 2 * * * /path/to/backup.sh") | crontab -
+home-learning-os/
+├── api/                      # Vercel Serverless Functions (备用)
+│   ├── analyze-image.ts
+│   ├── generate-courseware.ts
+│   └── generate-assessment.ts
+├── backend/                  # Node.js 后端 (主力)
+│   ├── src/
+│   │   ├── index.ts          # Express 入口
+│   │   ├── routes/           # API 路由
+│   │   │   ├── analyze.ts    # 图像分析
+│   │   │   ├── courseware.ts # 课件生成
+│   │   │   ├── assessment.ts # 试卷生成
+│   │   │   ├── anythingllm.ts# AnythingLLM 集成
+│   │   │   └── upload-book.ts# 图书上传
+│   │   └── services/         # 业务逻辑
+│   │       ├── bookMetadataAnalyzer.ts
+│   │       ├── pdfParser.ts
+│   │       └── epubParser.ts
+│   ├── package.json
+│   └── tsconfig.json
+├── components/               # React 组件 (14个)
+│   ├── Layout.tsx            # 布局框架
+│   ├── Dashboard.tsx         # 数据看板
+│   ├── CaptureModule.tsx     # 拍题模块
+│   ├── KnowledgeHub.tsx      # 知识库
+│   ├── ExamCenter.tsx        # 考场
+│   ├── LibraryHub.tsx        # 图书馆
+│   ├── StudyRoom.tsx         # 学习园地
+│   ├── LiveTutor.tsx         # 实时语音辅导
+│   ├── BookCard.tsx          # 图书卡片
+│   ├── BookUploader.tsx      # 图书上传器
+│   ├── BookMetadataEditor.tsx# 元数据编辑器
+│   ├── ChapterSelector.tsx   # 章节选择器
+│   ├── CoursewareGenerator.tsx# 课件生成器
+│   └── QuizGenerator.tsx     # 测验生成器
+├── services/                 # 前端服务层
+│   ├── geminiService.ts      # Gemini API 客户端
+│   ├── ragSearchService.ts   # RAG 搜索服务
+│   ├── bookStorage.ts        # IndexedDB 图书存储
+│   └── audioUtils.ts         # 语音工具
+├── types.ts                  # TypeScript 类型定义
+├── App.tsx                   # 应用根组件
+├── index.tsx                 # 入口文件
+├── index.html                # HTML 模板
+├── vite.config.ts            # Vite 配置
+├── docker-compose.yml        # Docker Compose 配置
+├── nginx.conf                # Nginx 配置
+├── deploy.sh                 # 一键部署脚本
+├── .env.example              # 环境变量模板
+└── README.md                 # 项目文档
 ```
 
 ---
 
-### 八、故障排查
+## 🔒 安全性说明
 
-#### 问题 1: 端口占用
+### API Key 保护
 
-**症状**: 容器启动失败，提示端口已被占用
+- ✅ **后端**: API Key 存储在服务器环境变量,前端无法访问
+- ✅ **容器隔离**: 敏感信息仅在容器内部网络传递
+- ✅ **Nginx 代理**: 前端通过 `/api/*` 路由访问后端,无直连
 
-```bash
-# 检查端口占用
-sudo lsof -i :80
-sudo lsof -i :3000
-sudo lsof -i :3001
+### 数据隐私
 
-# 停止占用端口的进程
-sudo kill -9 <PID>
+- **本地优先**: 图书数据存储在浏览器 IndexedDB,不上传服务器
+- **用户隔离**: 每个学生的数据通过 `ownerId` 严格隔离
+- **可选共享**: 家长可选择将教材设为 `shared` 状态
 
-# 或修改 docker-compose.yml 中的端口映射
-```
+### 注意事项
 
-#### 问题 2: 容器无法启动
-
-**症状**: `docker-compose up -d` 失败
-
-```bash
-# 查看详细错误日志
-docker-compose logs <service-name>
-
-# 检查配置文件语法
-docker-compose config
-
-# 检查 Docker 服务状态
-sudo systemctl status docker
-
-# 重启 Docker 服务
-sudo systemctl restart docker
-```
-
-#### 问题 3: 内存不足
-
-**症状**: 容器频繁重启，系统卡顿
-
-```bash
-# 查看内存使用
-free -h
-
-# 查看 Docker 容器内存限制
-docker inspect hl-anythingllm | grep -i memory
-
-# 临时清理缓存
-sudo sync && sudo sysctl -w vm.drop_caches=3
-
-# 调整 docker-compose.yml 中的内存限制
-# deploy:
-#   resources:
-#     limits:
-#       memory: 1.5G  # 降低内存限制
-```
-
-#### 问题 4: API Key 配置错误
-
-**症状**: 前端提示 API 错误，后端日志显示认证失败
-
-```bash
-# 检查环境变量
-docker-compose exec backend env | grep GEMINI
-docker-compose exec anythingllm env | grep GEMINI
-
-# 重新设置环境变量后需要重启
-docker-compose down
-docker-compose up -d
-
-# 检查 .env 文件格式（不要有多余空格）
-cat .env
-```
-
-#### 问题 5: Nginx 无法访问
-
-**症状**: 浏览器显示 502 Bad Gateway
-
-```bash
-# 检查 Nginx 日志
-docker-compose logs nginx
-
-# 检查后端是否正常运行
-docker-compose ps backend
-curl http://localhost:3000/api/health
-
-# 检查 Nginx 配置
-docker-compose exec nginx nginx -t
-
-# 重启 Nginx
-docker-compose restart nginx
-```
-
-#### 问题 6: 图书上传失败
-
-**症状**: 上传 PDF/EPUB 文件时报错
-
-```bash
-# 检查文件大小限制（默认 100MB）
-# 编辑 backend/src/routes/upload-book.ts 中的 fileSize 配置
-
-# 检查 Nginx 配置中的 client_max_body_size
-# 编辑 nginx.conf，确保：
-# client_max_body_size 100M;
-
-# 重启服务
-docker-compose restart nginx backend
-```
+- ❌ **切勿**将 `.env` 文件提交到 Git 仓库
+- ❌ **切勿**在前端代码中硬编码任何密钥
+- ⚠️ 图片会上传至 Google 服务器进行 OCR,请勿上传包含敏感个人信息的图片
 
 ---
 
-### 九、安全建议
+## 🌟 技术亮点
 
-#### 1. 定期更新系统
+1. **四层 OCR 提取协议**:
+   - 层级 1: 原始印刷内容
+   - 层级 2: 红笔批改痕迹
+   - 层级 3: 学生手写答案
+   - 层级 4: 订正闭环判定
 
-```bash
-sudo apt update && sudo apt upgrade -y
-```
+2. **RAG 检索增强**:
+   - Gemini Embedding 向量化
+   - LanceDB 高效向量存储
+   - 基于语义相似度的智能检索
 
-#### 2. 配置防火墙
+3. **System Instruction**:
+   - 内置"资深教育数字化专家" Persona
+   - 内置"资深学科命题组长" Persona
+   - 确保 AI 输出的专业性和教学价值
 
-仅开放必要端口（80, 443），关闭 3000, 3001 等内部端口的外部访问
+4. **JSON Schema 约束**:
+   - 强制 AI 输出符合 TypeScript 接口
+   - 无需正则解析,数据稳定性高
 
-#### 3. 使用 HTTPS
-
-生产环境必须配置 SSL 证书，保护数据传输安全
-
-#### 4. 定期备份数据
-
-至少每周备份一次 AnythingLLM 数据
-
-#### 5. 监控日志异常
-
-```bash
-# 实时监控错误日志
-docker-compose logs --tail=100 -f | grep -i error
-
-# 定期检查磁盘空间
-df -h
-```
-
-#### 6. 限制 SSH 访问
-
-```bash
-# 使用密钥认证
-ssh-keygen -t ed25519
-ssh-copy-id user@server
-
-# 禁用密码登录
-sudo nano /etc/ssh/sshd_config
-# PasswordAuthentication no
-sudo systemctl restart sshd
-```
-
-#### 7. API Key 安全
-
-- **切勿**将 `.env` 文件提交到 Git 仓库
-- **切勿**在日志中打印 API Key
-- 定期轮换 API Key
+5. **2核4G 服务器优化**:
+   - Docker 内存限制
+   - 分块策略优化
+   - Nginx 静态资源缓存
 
 ---
 
-## 📱 使用指南
+## 🔧 开发指南
 
-### 首次使用
+### 本地开发
 
-1. **访问应用**: 浏览器输入 `http://your-server-ip`
-2. **选择用户**: 点击头像切换学生（大宝/二宝）
-3. **上传图书**:
-   - 进入「图书馆」模块
-   - 点击「上传图书」
-   - 选择 PDF/EPUB/TXT 文件
-   - 等待 AI 自动分析元数据
-   - 编辑确认后保存
-4. **拍题录入**:
-   - 进入「拍题」模块
-   - 拍照或上传图片
-   - AI 自动识别并归档
-5. **生成课件**:
-   - 进入「学习园地」
-   - 选择教材和章节
-   - 选择教学风格
-   - 生成个性化课件
-6. **生成测验**:
-   - 在课件页面继续
-   - 自动生成配套测验
-   - 下载 Markdown 文件
-
-### 数据管理
-
-- **本地存储**: 图书数据存储在浏览器 IndexedDB 中
-- **云端存储**: 错题、笔记等数据可选择同步到云端
-- **数据导出**: 支持导出为 Markdown 格式
-
----
-
-## 🔧 本地开发
-
-### 前置要求
-
-- Node.js >= 18.0
-- npm >= 9.0
-- Google Gemini API Key
-
-### 开发步骤
-
+**前端开发**:
 ```bash
-# 1. 克隆代码
-git clone <repository-url>
-cd home-learning-os
-
-# 2. 安装前端依赖
 npm install
+npm run dev
+# 访问 http://localhost:5173
+```
 
-# 3. 安装后端依赖
+**后端开发**:
+```bash
 cd backend
 npm install
-cd ..
-
-# 4. 配置环境变量
-cp .env.example .env
-# 编辑 .env 填写 GEMINI_API_KEY
-
-# 5. 启动后端
-cd backend
 npm run dev
-# 后端运行在 http://localhost:3000
+# 访问 http://localhost:3000
+```
 
-# 6. 启动前端（新终端）
-npm run dev
-# 前端运行在 http://localhost:5173
+**AnythingLLM 本地启动**:
+```bash
+docker run -d \
+  -p 3001:3001 \
+  -e LLM_PROVIDER=gemini \
+  -e GEMINI_API_KEY=your_key \
+  mintplexlabs/anythingllm:latest
 ```
 
 ### 构建生产版本
 
 ```bash
-# 构建前端
+# 前端构建
 npm run build
+# 输出: dist/
 
-# 构建后端
+# 后端构建
 cd backend
 npm run build
+# 输出: dist/
 ```
 
 ---
 
-## 📊 系统监控
+## 📊 路线图
 
-### Prometheus + Grafana（可选）
+- [x] 阶段 1: 基础架构 (✅ 已完成)
+  - React 前端 + Express 后端
+  - Docker 容器化部署
+  - 多用户数据隔离
 
-```bash
-# docker-compose.monitoring.yml
-version: '3.8'
-services:
-  prometheus:
-    image: prom/prometheus
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-    ports:
-      - "9090:9090"
+- [x] 阶段 2: 核心功能 (✅ 已完成)
+  - 智能拍题 OCR
+  - 图书馆模块
+  - AI 学习园地
+  - 智能考场
 
-  grafana:
-    image: grafana/grafana
-    ports:
-      - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-```
+- [ ] 阶段 3: AnythingLLM 深度集成 (🚧 进行中)
+  - PDF/EPUB/TXT 解析
+  - 文档向量化索引
+  - RAG 检索优化
+
+- [ ] 阶段 4: 高级功能 (🗓️ 计划中)
+  - 实时语音辅导 (LiveTutor)
+  - 学习进度分析
+  - 知识图谱可视化
+  - 家长监控面板
 
 ---
 
 ## 🤝 贡献指南
 
-欢迎提交 Issue 和 Pull Request！
+欢迎提交 Issue 和 Pull Request!
 
-1. Fork 本仓库
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 开启 Pull Request
+**开发规范**:
+- 遵循 TypeScript 严格模式
+- 使用 ESLint + Prettier 格式化代码
+- 提交前执行 `npm run build` 确保无编译错误
 
 ---
 
-## 📄 许可证
+## 📄 License
 
-本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件
+MIT License
 
 ---
 
 ## 🙏 致谢
 
-- [Google Gemini](https://ai.google.dev/) - 强大的多模态 AI 引擎
-- [AnythingLLM](https://github.com/Mintplex-Labs/anything-llm) - 优秀的私有化 RAG 解决方案
-- [React](https://react.dev/) - 现代化的前端框架
-- [Tailwind CSS](https://tailwindcss.com/) - 高效的 CSS 框架
+- [Google Gemini](https://ai.google.dev/) - 多模态 AI 引擎
+- [AnythingLLM](https://github.com/Mintplex-Labs/anything-llm) - 开源 RAG 平台
+- [React](https://react.dev/) - 前端框架
+- [Vite](https://vitejs.dev/) - 构建工具
+- [Tailwind CSS](https://tailwindcss.com/) - 样式库
 
 ---
 
-## 📞 联系方式
-
-- 项目地址: [GitHub Repository]
-- 问题反馈: [Issues]
-- 设计文档: [docs/plans/2026-01-19-图书馆与AI学习园地-design.md]
-
----
-
-**Made with ❤️ for family education**
+**如有问题,请提交 Issue 或联系维护者。**
