@@ -1,9 +1,9 @@
 import pdfParse from 'pdf-parse';
-import { ChapterNode } from '../../../types.js';
+import { ChapterNode } from '../../../types';
 
 interface PDFParseResult {
   text: string;
-  pageCount: number;
+  numpages: number;
   metadata: {
     title?: string;
     author?: string;
@@ -50,7 +50,8 @@ export async function parsePDF(buffer: Buffer): Promise<BookParseResult> {
     };
   } catch (error) {
     console.error('PDF 解析失败:', error);
-    throw new Error(`PDF 解析失败: ${error.message}`);
+    const message = error instanceof Error ? error.message : '未知错误';
+    throw new Error(`PDF 解析失败: ${message}`);
   }
 }
 

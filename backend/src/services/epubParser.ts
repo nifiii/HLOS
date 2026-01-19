@@ -1,6 +1,6 @@
 import EPub from 'epub2';
-import { ChapterNode } from '../../../types.js';
-import { BookParseResult } from './pdfParser.js';
+import { ChapterNode } from '../../../types';
+import { BookParseResult } from './pdfParser';
 
 /**
  * 解析 EPUB 文件
@@ -10,20 +10,22 @@ import { BookParseResult } from './pdfParser.js';
 export async function parseEPUB(buffer: Buffer): Promise<BookParseResult> {
   return new Promise((resolve, reject) => {
     try {
-      const epub = new EPub(buffer);
+      const epub = new EPub(buffer as any);
 
-      epub.on('error', (error) => {
+      epub.on('error', (error: any) => {
         console.error('EPUB 解析失败:', error);
-        reject(new Error(`EPUB 解析失败: ${error.message}`));
+        const message = error instanceof Error ? error.message : '未知错误';
+        reject(new Error(`EPUB 解析失败: ${message}`));
       });
 
       epub.on('end', async () => {
         try {
           // 提取元数据
+          const subject = epub.metadata.subject;
           const estimatedMetadata = {
             title: epub.metadata.title || undefined,
             author: epub.metadata.creator || undefined,
-            subject: epub.metadata.subject || undefined,
+            subject: Array.isArray(subject) ? subject.join(', ') : subject || undefined,
           };
 
           // 提取章节信息
@@ -49,7 +51,8 @@ export async function parseEPUB(buffer: Buffer): Promise<BookParseResult> {
       epub.parse();
     } catch (error) {
       console.error('EPUB 初始化失败:', error);
-      reject(new Error(`EPUB 初始化失败: ${error.message}`));
+      const message = error instanceof Error ? error.message : '未知错误';
+      reject(new Error(`EPUB 初始化失败: ${message}`));
     }
   });
 }

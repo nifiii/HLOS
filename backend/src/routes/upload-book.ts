@@ -100,9 +100,10 @@ router.post('/upload-book', upload.single('file'), async (req: Request, res: Res
     });
   } catch (error) {
     console.error('文件解析失败:', error);
+    const message = error instanceof Error ? error.message : '文件解析失败';
     return res.status(500).json({
       success: false,
-      error: error.message || '文件解析失败',
+      error: message,
     });
   }
 });

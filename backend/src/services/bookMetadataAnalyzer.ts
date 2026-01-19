@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from '@google/genai';
-import { ChapterNode } from '../../../types.js';
+import { ChapterNode } from '../../../types';
 
 const apiKey = process.env.GEMINI_API_KEY;
 
@@ -140,12 +140,16 @@ ${preliminaryTOC.length > 0 ? JSON.stringify(preliminaryTOC, null, 2) : '无'}
     });
 
     const rawJson = response.text;
+    if (!rawJson) {
+      throw new Error('AI 返回结果为空');
+    }
     const metadata: BookMetadataAnalysisResult = JSON.parse(rawJson);
 
     console.log('元数据分析成功:', metadata.title);
     return metadata;
   } catch (error) {
     console.error('Gemini 元数据分析失败:', error);
-    throw new Error(`元数据分析失败: ${error.message}`);
+    const message = error instanceof Error ? error.message : '未知错误';
+    throw new Error(`元数据分析失败: ${message}`);
   }
 }
