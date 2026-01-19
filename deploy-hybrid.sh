@@ -211,19 +211,27 @@ echo "--------------------------------"
 
 sleep 5
 
-# 检查后端
-if curl -f http://127.0.0.1:3000/health >/dev/null 2>&1; then
-    echo -e "${GREEN}✅ 后端健康检查通过${NC}"
+# 检查后端（直接访问后端端口）
+if curl -f http://127.0.0.1:3000/api/health >/dev/null 2>&1; then
+    echo -e "${GREEN}✅ 后端健康检查通过 (直连)${NC}"
 else
     echo -e "${RED}❌ 后端健康检查失败${NC}"
     echo "查看日志: journalctl -u hl-backend -n 50"
 fi
 
-# 检查 Nginx
-if curl -f http://127.0.0.1/health >/dev/null 2>&1; then
-    echo -e "${GREEN}✅ Nginx 健康检查通过${NC}"
+# 检查 Nginx（通过 Nginx 代理访问后端）
+if curl -f http://127.0.0.1/api/health >/dev/null 2>&1; then
+    echo -e "${GREEN}✅ Nginx 代理检查通过${NC}"
 else
-    echo -e "${YELLOW}⚠️  Nginx 健康检查失败${NC}"
+    echo -e "${YELLOW}⚠️  Nginx 代理检查失败（可能需配置 DNS）${NC}"
+    echo "   本地测试: curl http://127.0.0.1/api/health"
+fi
+
+# 检查 Nginx 自身健康检查端点
+if curl -f http://127.0.0.1/health >/dev/null 2>&1; then
+    echo -e "${GREEN}✅ Nginx 健康端点通过${NC}"
+else
+    echo -e "${YELLOW}⚠️  Nginx 健康端点未响应${NC}"
 fi
 
 # 检查 AnythingLLM
