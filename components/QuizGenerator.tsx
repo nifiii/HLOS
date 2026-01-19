@@ -48,7 +48,8 @@ export const QuizGenerator: React.FC<QuizGeneratorProps> = ({
       setQuiz(result.data.markdown);
     } catch (err) {
       console.error('生成测验失败:', err);
-      setError(err.message || '生成失败，请重试');
+      const message = err instanceof Error ? err.message : '生成失败，请重试';
+      setError(message);
     } finally {
       setGenerating(false);
     }

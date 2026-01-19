@@ -65,15 +65,15 @@ const LiveTutor: React.FC<LiveTutorProps> = ({ currentUser, onClose }) => {
           },
           onmessage: async (message: LiveServerMessage) => {
             if (message.serverContent?.inputTranscription) {
-              const text = message.serverContent.inputTranscription.text;
+              const text = message.serverContent.inputTranscription.text ?? '';
               setTranscription(prev => [...prev, { type: 'user', text }]);
             }
             if (message.serverContent?.outputTranscription) {
-              const text = message.serverContent.outputTranscription.text;
+              const text = message.serverContent.outputTranscription.text ?? '';
               setTranscription(prev => [...prev, { type: 'model', text }]);
             }
 
-            const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
+            const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
             if (base64Audio) {
               setIsSpeaking(true);
               const ctx = outputAudioContextRef.current!;

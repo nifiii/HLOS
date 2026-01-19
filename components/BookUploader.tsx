@@ -82,7 +82,8 @@ export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, own
       }, 2000);
     } catch (err) {
       console.error('上传失败:', err);
-      setError(err.message || '上传失败，请重试');
+      const message = err instanceof Error ? err.message : '上传失败，请重试';
+      setError(message);
     } finally {
       setUploading(false);
     }

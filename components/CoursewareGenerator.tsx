@@ -85,7 +85,8 @@ export const CoursewareGenerator: React.FC<CoursewareGeneratorProps> = ({
       setCourseware(result.data.markdown);
     } catch (err) {
       console.error('生成课件失败:', err);
-      setError(err.message || '生成失败，请重试');
+      const message = err instanceof Error ? err.message : '生成失败，请重试';
+      setError(message);
     } finally {
       setGenerating(false);
     }
