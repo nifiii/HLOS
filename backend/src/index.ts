@@ -5,6 +5,7 @@ import analyzeRouter from './routes/analyze.js';
 import coursewareRouter from './routes/courseware.js';
 import assessmentRouter from './routes/assessment.js';
 import anythingllmRouter from './routes/anythingllm.js';
+import uploadBookRouter from './routes/upload-book.js';
 
 dotenv.config();
 
@@ -36,6 +37,7 @@ app.use('/api', analyzeRouter);
 app.use('/api', coursewareRouter);
 app.use('/api', assessmentRouter);
 app.use('/api/anythingllm', anythingllmRouter);
+app.use('/api', uploadBookRouter);
 
 // 404 处理
 app.use((req, res) => {

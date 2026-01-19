@@ -8,7 +8,8 @@ import ExamCenter from './components/ExamCenter';
 import LibraryHub from './components/LibraryHub';
 import StudyRoom from './components/StudyRoom';
 import LiveTutor from './components/LiveTutor';
-import { ScannedItem, UserProfile } from './types';
+import { ScannedItem, UserProfile, EBook } from './types';
+import { getAllBooks } from './services/bookStorage';
 
 const FAMILY_PROFILES: UserProfile[] = [
   { id: 'child_1', name: '大宝', avatar: '👦', grade: '高中二年级' },
@@ -19,8 +20,22 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [currentUser, setCurrentUser] = useState<UserProfile>(FAMILY_PROFILES[0]);
   const [scannedItems, setScannedItems] = useState<ScannedItem[]>([]);
+  const [books, setBooks] = useState<EBook[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showTutor, setShowTutor] = useState(false);
+
+  // 加载图书数据
+  useEffect(() => {
+    const loadBooks = async () => {
+      try {
+        const allBooks = await getAllBooks();
+        setBooks(allBooks);
+      } catch (error) {
+        console.error('加载图书失败:', error);
+      }
+    };
+    loadBooks();
+  }, []);
 
   // 自动清除错误消息
   useEffect(() => {
@@ -31,10 +46,16 @@ const App: React.FC = () => {
   }, [errorMsg]);
 
   const filteredItems = useMemo(() => {
-    return scannedItems.filter(item => 
+    return scannedItems.filter(item =>
       item.ownerId === currentUser.id || item.ownerId === 'shared'
     );
   }, [scannedItems, currentUser.id]);
+
+  const filteredBooks = useMemo(() => {
+    return books.filter(book =>
+      book.ownerId === currentUser.id || book.ownerId === 'shared'
+    );
+  }, [books, currentUser.id]);
 
   const handleScanComplete = (item: ScannedItem) => {
     setScannedItems(prev => [item, ...prev]);
@@ -62,7 +83,7 @@ const App: React.FC = () => {
         case 'dashboard':
           return <Dashboard items={filteredItems} currentUser={currentUser} />;
         case 'library_hub':
-          return <LibraryHub />;
+          return <LibraryHub currentUserId={currentUser.id} />;
         case 'capture':
           return <CaptureModule onScanComplete={handleScanComplete} currentUser={currentUser} />;
         case 'tutor':
@@ -84,7 +105,7 @@ const App: React.FC = () => {
             </div>
           );
         case 'study_room':
-          return <StudyRoom currentUser={currentUser} />;
+          return <StudyRoom currentUser={currentUser} books={filteredBooks} wrongProblems={filteredItems} />;
         case 'vault':
           return <KnowledgeHub items={filteredItems} currentUser={currentUser} />;
         case 'exams':

@@ -51,16 +51,43 @@ export interface UserProfile {
   grade: string;
 }
 
+export enum IndexStatus {
+  PENDING = 'pending',
+  INDEXING = 'indexing',
+  INDEXED = 'indexed',
+  FAILED = 'failed'
+}
+
+export interface ChapterNode {
+  id: string;
+  title: string;
+  level: number;  // 1=章, 2=节, 3=小节
+  pageRange?: { start: number; end: number };
+  children: ChapterNode[];
+}
+
 export interface EBook {
   id: string;
   title: string;
-  author: string;
-  coverUrl: string;
-  subject: string;
-  category: string; 
-  chapters: string[];
-  isPublic: boolean;
-  indexedAt?: number;
+  author?: string;
+  coverUrl?: string;  // 封面图（PDF第一页截图或自动生成）
+  fileFormat: 'pdf' | 'epub' | 'txt';
+  fileSize: number;  // 字节
+  uploadedAt: number;
+  ownerId: string;  // 可以是 'shared' 表示家庭共享
+
+  // AI 自动提取的元数据（用户可编辑）
+  subject: string;  // 数学/物理/英语
+  category: string;  // 教材/教辅/竞赛资料/考试真题
+  grade: string;  // 小学/初中/高中
+  tags: string[];  // ['奥数', '几何', '代数']
+
+  // 章节目录（AI提取）
+  tableOfContents: ChapterNode[];
+
+  // AnythingLLM 状态
+  indexStatus: IndexStatus;
+  anythingLlmDocId?: string;
 }
 
 export interface StructuredMetaData {

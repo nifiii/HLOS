@@ -1,99 +1,196 @@
+import React, { useState, useMemo } from 'react';
+import { GraduationCap, BookOpen, FileText, ClipboardCheck } from 'lucide-react';
+import { UserProfile, EBook, ChapterNode, ScannedItem } from '../types';
+import { ChapterSelector } from './ChapterSelector';
+import { CoursewareGenerator } from './CoursewareGenerator';
+import { QuizGenerator } from './QuizGenerator';
 
-import React, { useState } from 'react';
-import { generateCourseware, generateAssessment } from '../services/geminiService';
-import { UserProfile, KnowledgeStatus } from '../types';
+interface StudyRoomProps {
+  currentUser: UserProfile;
+  books: EBook[];
+  wrongProblems: ScannedItem[];
+}
 
-const StudyRoom: React.FC<{ currentUser: UserProfile }> = ({ currentUser }) => {
-  const [selectedBook, setSelectedBook] = useState('小学数学（人教版）');
-  const [selectedChapter, setSelectedChapter] = useState('第一章：认识图形');
-  const [loading, setLoading] = useState(false);
-  const [content, setContent] = useState<string | null>(null);
+type StudyStep = 'select' | 'courseware' | 'quiz';
 
-  const handleAction = async (type: 'course' | 'test') => {
-    setLoading(true);
-    try {
-      const res = type === 'course' 
-        ? await generateCourseware(selectedBook, selectedChapter, currentUser.name)
-        : await generateAssessment({ type: 'unit', chapter: selectedChapter }, [], currentUser.name);
-      setContent(res);
-    } catch (e) {
-      alert("操作失败");
-    } finally {
-      setLoading(false);
-    }
+const StudyRoom: React.FC<StudyRoomProps> = ({ currentUser, books, wrongProblems }) => {
+  const [currentStep, setCurrentStep] = useState<StudyStep>('select');
+  const [selectedBook, setSelectedBook] = useState<EBook | null>(null);
+  const [selectedChapter, setSelectedChapter] = useState<ChapterNode | null>(null);
+  const [coursewareContent, setCoursewareContent] = useState<string>('');
+
+  // 过滤出当前章节相关的错题
+  const relevantWrongProblems = useMemo(() => {
+    if (!selectedBook || !selectedChapter) return [];
+
+    return wrongProblems.filter((item) => {
+      // 简单匹配：学科相同
+      return item.meta.subject === selectedBook.subject;
+      // TODO: 更精细的匹配逻辑（根据章节标题、知识点等）
+    });
+  }, [selectedBook, selectedChapter, wrongProblems]);
+
+  // 处理章节选择
+  const handleChapterSelect = (book: EBook, chapter: ChapterNode) => {
+    setSelectedBook(book);
+    setSelectedChapter(chapter);
+    setCurrentStep('courseware');
+  };
+
+  // 返回章节选择
+  const handleBackToSelect = () => {
+    setCurrentStep('select');
+    setSelectedBook(null);
+    setSelectedChapter(null);
+    setCoursewareContent('');
+  };
+
+  // 跳转到测验生成
+  const handleGotoQuiz = (courseware: string) => {
+    setCoursewareContent(courseware);
+    setCurrentStep('quiz');
+  };
+
+  // 渲染步骤指示器
+  const renderStepIndicator = () => {
+    const steps = [
+      { key: 'select', label: '选择章节', icon: BookOpen },
+      { key: 'courseware', label: '生成课件', icon: FileText },
+      { key: 'quiz', label: '配套测验', icon: ClipboardCheck },
+    ];
+
+    return (
+      <div className="flex items-center justify-center gap-2 mb-8">
+        {steps.map((step, index) => {
+          const Icon = step.icon;
+          const isActive = currentStep === step.key;
+          const isCompleted =
+            (step.key === 'select' && selectedChapter) ||
+            (step.key === 'courseware' && coursewareContent);
+
+          return (
+            <React.Fragment key={step.key}>
+              <div
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
+                  isActive
+                    ? 'bg-blue-600 text-white'
+                    : isCompleted
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-gray-100 text-gray-500'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                <span className="text-sm font-medium">{step.label}</span>
+              </div>
+              {index < steps.length - 1 && (
+                <div className="w-8 h-0.5 bg-gray-300"></div>
+              )}
+            </React.Fragment>
+          );
+        })}
+      </div>
+    );
   };
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="bg-slate-900 text-white rounded-[2.5rem] p-8 md:p-10 shadow-2xl relative overflow-hidden">
-         <div className="absolute top-0 right-0 p-10 opacity-10">
-            <i className="fa-solid fa-graduation-cap text-9xl"></i>
-         </div>
-         
-         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
-            <div className="space-y-4">
-               <h2 className="text-3xl font-black tracking-tight">智能自习室</h2>
-               <div className="flex flex-wrap gap-4">
-                  <div className="bg-white/10 px-4 py-2 rounded-xl border border-white/10">
-                     <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">当前指定教材</label>
-                     <select 
-                       value={selectedBook} 
-                       onChange={(e) => setSelectedBook(e.target.value)}
-                       className="bg-transparent text-sm font-bold outline-none cursor-pointer"
-                     >
-                        <option value="小学数学（人教版）">小学数学（人教版）</option>
-                        <option value="初中英语阅读精选">初中英语阅读精选</option>
-                     </select>
-                  </div>
-                  <div className="bg-white/10 px-4 py-2 rounded-xl border border-white/10">
-                     <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">当前学习进度</label>
-                     <select 
-                       value={selectedChapter}
-                       onChange={(e) => setSelectedChapter(e.target.value)}
-                       className="bg-transparent text-sm font-bold outline-none cursor-pointer"
-                     >
-                        <option value="第一章：认识图形">第一章：认识图形</option>
-                        <option value="第二章：10以内加减法">第二章：10以内加减法</option>
-                     </select>
-                  </div>
-               </div>
+      {/* 顶部标题 */}
+      <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-2xl p-8 shadow-lg">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <GraduationCap className="w-10 h-10" />
+              <h2 className="text-3xl font-bold">AI 学习园地</h2>
             </div>
-
-            <div className="flex flex-col gap-3">
-               <button onClick={() => handleAction('course')} className="bg-brand-500 hover:bg-brand-600 px-8 py-3 rounded-2xl text-xs font-black shadow-lg transition-all active:scale-95">
-                 <i className="fa-solid fa-wand-sparkles mr-2"></i> 生成教学课件
-               </button>
-               <div className="grid grid-cols-2 gap-3">
-                  <button onClick={() => handleAction('test')} className="bg-slate-800 hover:bg-slate-700 border border-slate-700 px-4 py-2 rounded-xl text-[10px] font-bold transition-all">单元测试</button>
-                  <button onClick={() => handleAction('test')} className="bg-slate-800 hover:bg-slate-700 border border-slate-700 px-4 py-2 rounded-xl text-[10px] font-bold transition-all">模拟测试</button>
-               </div>
-            </div>
-         </div>
+            <p className="text-blue-100 text-sm">
+              为 {currentUser.name} 定制的个性化学习内容
+            </p>
+          </div>
+          <div className="text-right">
+            <div className="text-sm text-blue-100 mb-1">当前年级</div>
+            <div className="text-2xl font-bold">{currentUser.grade}</div>
+          </div>
+        </div>
       </div>
 
-      {loading && (
-        <div className="py-20 text-center animate-pulse">
-          <i className="fa-solid fa-spinner fa-spin text-4xl text-brand-500 mb-4"></i>
-          <p className="text-sm font-black text-slate-400 uppercase tracking-widest">AnythingLLM 正在快速索引教材内容...</p>
+      {/* 步骤指示器 */}
+      {renderStepIndicator()}
+
+      {/* 内容区域 */}
+      {currentStep === 'select' && (
+        <div>
+          <div className="mb-4">
+            <h3 className="text-lg font-semibold text-gray-800 mb-2">
+              第一步：选择学习内容
+            </h3>
+            <p className="text-sm text-gray-600">
+              从您的图书馆中选择一本教材和具体章节，开始生成个性化学习内容
+            </p>
+          </div>
+          <ChapterSelector
+            books={books}
+            onSelect={handleChapterSelect}
+          />
         </div>
       )}
 
-      {content && !loading && (
-        <div className="bg-white rounded-[2rem] shadow-xl border border-slate-100 p-8 md:p-12 animate-slide-up">
-           <div className="flex justify-between items-center mb-8 border-b border-slate-50 pb-6">
-              <span className="text-[10px] font-black bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-full uppercase tracking-widest">
-                Generated Courseware / Assessment
-              </span>
-              <button 
-                onClick={() => alert(`已按照分级策略同步至 Obsidian: ${currentUser.name}/2026-01/Math/Courses/`)}
-                className="text-slate-400 hover:text-brand-500 transition-colors flex items-center text-xs font-bold"
-              >
-                <i className="fa-solid fa-share-nodes mr-2"></i> 存档至 Obsidian Vault
-              </button>
-           </div>
-           <div className="prose prose-slate max-w-none whitespace-pre-wrap font-medium text-slate-700 leading-relaxed">
-             {content}
-           </div>
+      {currentStep === 'courseware' && selectedBook && selectedChapter && (
+        <div>
+          <CoursewareGenerator
+            selectedBook={selectedBook}
+            selectedChapter={selectedChapter}
+            wrongProblems={relevantWrongProblems}
+            onBack={handleBackToSelect}
+          />
+
+          {/* 继续下一步按钮（课件生成后显示） */}
+          <div className="mt-6 flex justify-center">
+            <button
+              onClick={() => setCurrentStep('quiz')}
+              className="flex items-center gap-2 px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium shadow-lg"
+            >
+              <ClipboardCheck className="w-5 h-5" />
+              继续生成配套测验
+            </button>
+          </div>
+        </div>
+      )}
+
+      {currentStep === 'quiz' && selectedBook && selectedChapter && (
+        <div>
+          <QuizGenerator
+            selectedBook={selectedBook}
+            selectedChapter={selectedChapter}
+            wrongProblems={relevantWrongProblems}
+            coursewareContent={coursewareContent}
+          />
+
+          {/* 完成按钮 */}
+          <div className="mt-6 flex justify-center gap-4">
+            <button
+              onClick={handleBackToSelect}
+              className="px-8 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+            >
+              返回首页
+            </button>
+            <button
+              onClick={() => setCurrentStep('courseware')}
+              className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            >
+              返回课件
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 提示信息（选择步骤且无图书时） */}
+      {currentStep === 'select' && books.length === 0 && (
+        <div className="text-center py-12">
+          <BookOpen className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <p className="text-gray-600 mb-2">您的图书馆还没有教材</p>
+          <p className="text-sm text-gray-500">
+            请先前往「图书馆」上传您的电子教材
+          </p>
         </div>
       )}
     </div>
