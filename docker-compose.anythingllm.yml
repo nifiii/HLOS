@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  anythingllm:
+    image: mintplexlabs/anythingllm:latest
+    container_name: hl-anythingllm
+    ports:
+      - "127.0.0.1:3001:3001"  # 仅监听本地，通过 Nginx 代理
+    volumes:
+      - /opt/hl-os/anythingllm-storage:/app/server/storage
+      - /opt/hl-os/anythingllm-hotdir:/app/server/storage/hotdir
+    environment:
+      - LLM_PROVIDER=gemini
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - EMBEDDING_ENGINE=gemini
+      - GEMINI_EMBEDDING_MODEL=text-embedding-004
+      - VECTOR_DB=lancedb
+      - AUTH_TOKEN=${ANYTHINGLLM_API_KEY}
+      - SERVER_PORT=3001
+      # 2核4G 优化
+      - CHUNK_SIZE=800
+      - CHUNK_OVERLAP=150
+      - MAX_CONCURRENT_CHUNKS=2
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1.5G
+        reservations:
+          memory: 512M

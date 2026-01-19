@@ -21,8 +21,8 @@ services:
   # Node.js 后端
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .  # 项目根目录
+      dockerfile: backend/Dockerfile
       target: production  # 使用生产阶段
     container_name: hl-backend
     ports:
