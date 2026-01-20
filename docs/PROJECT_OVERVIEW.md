@@ -1,7 +1,8 @@
 # 智学 OS (Home-Learning-OS) 项目架构与功能描述
 
 **生成时间**: 2026-01-20
-**项目版本**: v1.0.0
+**最后更新**: 2026-01-20
+**项目版本**: v1.1.0 (服务端存储架构)
 **文档用途**: 为功能优化和UI调试提供全面的技术参考
 
 ---
@@ -54,28 +55,43 @@
 │  │  │Dashboard│ Library │ Capture │StudyRoom│ Tutor  │  │  │
 │  │  └─────────┴─────────┴─────────┴─────────┴─────────┘  │  │
 │  │  ┌───────────────────────────────────────────────────┐  │  │
-│  │  │    IndexedDB (bookStorage.ts)                     │  │  │
-│  │  │    - EBook[]                                      │  │  │
-│  │  │    - ScannedItem[] (可选持久化)                   │  │  │
+│  │  │    API Service Layer (apiService.ts)             │  │  │
+│  │  │    - fetchBooks()                                │  │  │
+│  │  │    - fetchScannedItems()                         │  │  │
+│  │  │    - saveScannedItemToServer()                   │  │  │
+│  │  │    - saveBookToServer()                          │  │  │
 │  │  └───────────────────────────────────────────────────┘  │  │
 │  └───────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
-                            │ HTTPS/WS
+                            │ HTTPS/API
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                  Nginx (Reverse Proxy)                       │
 │           :80/:443 → 后端 :3000, AnythingLLM :3001         │
-└─────────────────────────────────────────────────────────────┘
+└──────────────────────────────────────���──────────────────────┘
                             │
         ┌───────────────────┴───────────────────┐
         ▼                                       ▼
 ┌──────────────────┐                  ┌──────────────────────┐
-│  Node.js Backend │                  │  AnythingLLM RAG     │
-│  Express.js      │◄─────────────────┤  向量数据库           │
-│  :3000           │  Index API       │  :3001               │
-└──────────────────┘                  └──────────────────────┘
-        │
-        ▼
+│  Node.js Backend │◄─────────────────┤  AnythingLLM RAG     │
+│  Express.js      │  Index API       │  (LanceDB + Gemini)  │
+│  :3000           │                  │  :3001               │
+└─────────┬────────┘                  └──────────────────────┘
+         │
+         ▼
+┌──────────────────────────────────────────────────┐
+│     服务端文件系统 (/opt/hl-os/data/)            │
+│  ├─ obsidian/          (Obsidian Markdown)       │
+│  │  ├─ Wrong_Problems/  (错题本)                │
+│  │  ├─ No_Problems/     (试卷作业)              │
+│  │  └─ Courses/         (课件测验)              │
+│  ├─ originals/         (原始文件)                │
+│  │  ├─ images/          (原始图片)              │
+│  │  └─ books/           (电子教材)              │
+│  └─ metadata.json      (元数据索引)             │
+└──────────────────────────────────────────────────┘
+         │
+         ▼
 ┌──────────────────────────────────────────────────┐
 │           Google Gemini API                      │
 │  - gemini-3-flash-preview (图像分析/课件)        │
@@ -100,7 +116,7 @@
 | **Lucide React** | 0.263.1 | 图标库 (2000+ SVG图标) |
 | **React Markdown** | 8.0.7 | Markdown渲染 (课件/试卷) |
 | **Canvas Confetti** | 1.9.4 | 庆祝动画效果 |
-| **IndexedDB** | 原生API | 浏览器本地存储 (bookStorage.ts) |
+| **API Service Layer** | 自定义 | 服务端API调用封装 (apiService.ts) |
 
 ### 2.2 后端技术栈
 
@@ -114,6 +130,7 @@
 | **pdf-parse** | 1.1.1 | PDF文本提取 |
 | **epub2** | 3.0.2 | EPUB电子书解析 |
 | **cors** | 2.8.5 | 跨域资源共享 |
+| **fileStorage.ts** | 自定义 | 文件系统服务 (Obsidian + originals) |
 
 ### 2.3 开发与部署工具
 
@@ -185,13 +202,14 @@ App.tsx
 **上传流程**:
 ```
 1. 用户选择文件 (BookUploader)
-2. POST /api/upload-book (multipart/form-data)
-3. 后端解析文件内容 (pdfParser/epubParser)
-4. Gemini AI 分析元数据 (bookMetadataAnalyzer)
-5. 返回包含元数据的EBook对象
-6. 前端显示元数据编辑器 (BookMetadataEditor)
-7. 用户确认/修改后保存到IndexedDB
-8. 可选：索引到AnythingLLM向量库
+2. POST /api/save-book (multipart/form-data)
+3. 后端保存文件到 /opt/hl-os/data/originals/books/
+4. 后端解析文件内容 (pdfParser/epubParser)
+5. Gemini AI 分析元数据 (bookMetadataAnalyzer)
+6. 返回包含元数据和文件路径的EBook对象
+7. 前端显示元数据编辑器 (BookMetadataEditor)
+8. 用户确认/修改后，文件已保存在服务器
+9. 自动索引到AnythingLLM向量库
 ```
 
 **关键组件**:
@@ -1250,14 +1268,15 @@ ownerId: 'child_1'
                   │
                   ▼
 ┌─────────────────────────────────────────────────────────┐
-│  6. 保存到IndexedDB                                      │
-│     bookStorage.saveBook(eBook)                         │
-│     - 浏览器本地持久化                                   │
+│  6. 文件已保存在服务器                                    │
+│     - 原始PDF已保存到 /opt/hl-os/data/originals/books/    │
+│     - 元数据已索引到 metadata.json                      │
+│     - 自动触发AnythingLLM索引                           │
 └─────────────────┬───────────────────────────────────────┘
                   │
                   ▼
 ┌─────────────────────────────────────────────────────────┐
-│  7. 可选: RAG索引                                         │
+│  7. RAG索引（自动）                                        │
 │     POST /api/anythingllm/index-book                    │
 │     - 向量化存储用于上下文检索                           │
 └─────────────────────────────────────────────────────────┘
@@ -1518,31 +1537,35 @@ curl https://hl-os.example.com/api/health
 
 ### 9.1 功能层面
 
+**已实现功能**:
+1. ✅ **服务端数据持久化**: 三层存储架构（Obsidian + 文件系统 + AnythingLLM）
+2. ✅ **跨设备同步**: 数据保存在服务器，支持多设备访问
+3. ✅ **自动索引**: AnythingLLM向量数据库自动索引
+4. ✅ **Obsidian兼容**: 生成标准Markdown格式，便于导出
+
 **已知限制**:
-1. ❌ **无真实数据库**: 前端依赖IndexedDB，数据无法跨设备同步
-2. ❌ **无用户认证**: 多用户切换基于本地状态，无后端验证
-3. ❌ **统计数据硬编码**: Dashboard部分数据为静态数据
-4. ❌ **无真实考试模式**: ExamCenter尚未实现计时器和自动批改
-5. ❌ **AnythingLLM集成不完整**: RAG检索尚未在所有功能中启用
+1. ⚠️ **无用户认证**: 多用户切换基于本地状态，无后端验证
+2. ⚠️ **统计数据硬编码**: Dashboard部分数据为静态数据
+3. ❌ **无真实考试模式**: ExamCenter尚未实现计时器和自动批改
+4. ⚠️ **删除功能暂未实现**: 删除按钮已禁用（需实现服务端删除API）
 
 **优化方向**:
-1. ✅ **引入后端数据库** (PostgreSQL + Prisma)
-   - 用户认证 (JWT)
-   - 数据持久化
-   - 跨设备同步
+1. ⏳ **用户认证系统** (JWT)
+   - 用户登录/注册
+   - 权限控制
 
-2. ✅ **完善统计功能**
+2. ⏳ **完善统计功能**
    - 真实学习时长统计
    - 知识点掌握度分析
    - 错题趋势图表
 
-3. ✅ **增强考试模式**
+3. ⏳ **增强考试模式**
    - 倒计时功能
    - 自动提交
    - AI自动批改
    - 成绩报告生成
 
-4. ✅ **深度集成AnythingLLM**
+4. ⏳ **实现删除功能**
    - 所有AI生成功能接入RAG
    - 教材全文检索
    - 智能问答系统
@@ -1699,19 +1722,21 @@ HL-os/
 │   │       ├── geminiService.ts          # Gemini API封装
 │   │       ├── bookMetadataAnalyzer.ts   # 元数据提取
 │   │       ├── pdfParser.ts              # PDF解析
-│   │       └── epubParser.ts             # EPUB解析
+│   │       ├── epubParser.ts             # EPUB解析
+│   │       └── fileStorage.ts            # 文件系统服务 ⭐NEW
 │   │
 │   └── package.json
 │
 ├── types.ts                     # 全局类型定义
 ├── App.tsx                      # 根组件
-├── bookStorage.ts               # IndexedDB封装
+├── apiService.ts                # API服务层 ⭐NEW
 ├── tailwind.config.js           # Tailwind配置
 ├── vite.config.ts               # Vite配置
 ├── tsconfig.json                # TypeScript配置
 ├── docker-compose.yml           # Docker编排
 └── docs/
-    └── PROJECT_OVERVIEW.md      # 本文档
+    ├── PROJECT_OVERVIEW.md      # 本文档
+    └── DEPLOYMENT_GUIDE.md       # 部署指南 ⭐NEW
 ```
 
 ---
