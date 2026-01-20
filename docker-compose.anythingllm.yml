@@ -10,6 +10,8 @@ services:
       - /opt/hl-os/anythingllm-storage:/app/server/storage
       - /opt/hl-os/anythingllm-hotdir:/app/server/storage/hotdir
     environment:
+      # ⚠️ 关键配置：数据持久化存储路径（容器内路径）
+      - STORAGE_DIR=/app/server/storage
       - LLM_PROVIDER=gemini
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - EMBEDDING_ENGINE=gemini
