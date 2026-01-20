@@ -27,11 +27,11 @@ router.post('/generate-courseware', async (req: Request, res: Response, next: Ne
     const ai = new GoogleGenAI({ apiKey });
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
+      model: 'gemini-3-flash-preview', // 使用 Flash 模型：速度更快，配额更大
       contents: `学生: ${studentName}, 教材: ${bookTitle}, 章节: ${chapter}\n基于以上信息生成 Markdown 格式的个性化课件。`,
       config: {
         systemInstruction: "你是一位资深学科专家。请根据学生的认知程度生成高质量 Markdown 课件。",
-        thinkingConfig: { thinkingBudget: 2048 }
+        temperature: 0.7
       }
     });
 
