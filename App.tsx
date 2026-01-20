@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
 import CaptureModule from './components/CaptureModule';
@@ -77,6 +78,19 @@ const App: React.FC = () => {
     </div>
   ) : null;
 
+  // 页面切换动画配置
+  const pageVariants = {
+    initial: { opacity: 0, y: 20 },
+    animate: { opacity: 1, y: 0 },
+    exit: { opacity: 0, y: -20 }
+  };
+
+  const pageTransition = {
+    type: 'tween',
+    ease: 'easeInOut',
+    duration: 0.3
+  };
+
   const renderContent = () => {
     try {
       switch (activeTab) {
@@ -96,7 +110,7 @@ const App: React.FC = () => {
                   <h3 className="text-2xl font-black text-slate-800">实时语音辅导</h3>
                   <p className="text-slate-500 max-w-sm mt-2 font-medium">与 Gemini 2.5 专家模型开启面对面语音交流，解决学习难题。</p>
                </div>
-               <button 
+               <button
                 onClick={() => setShowTutor(true)}
                 className="bg-brand-500 hover:bg-brand-600 text-white px-10 py-4 rounded-2xl font-black shadow-xl transition-all active:scale-95"
                >
@@ -120,15 +134,26 @@ const App: React.FC = () => {
   };
 
   return (
-    <Layout 
-      activeTab={activeTab} 
+    <Layout
+      activeTab={activeTab}
       onTabChange={setActiveTab}
       currentUser={currentUser}
       availableUsers={FAMILY_PROFILES}
       onSwitchUser={handleUserSwitch}
     >
       <ErrorToast />
-      {renderContent()}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeTab}
+          variants={pageVariants}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          transition={pageTransition}
+        >
+          {renderContent()}
+        </motion.div>
+      </AnimatePresence>
       {showTutor && <LiveTutor currentUser={currentUser} onClose={() => setShowTutor(false)} />}
     </Layout>
   );
