@@ -1,6 +1,6 @@
-
 import React from 'react';
 import { UserProfile } from '../types';
+import { Home, Camera, BookOpen, Library, GraduationCap, FileText, Mic, LucideIcon } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -11,108 +11,143 @@ interface LayoutProps {
   onSwitchUser: (userId: string) => void;
 }
 
-const Layout: React.FC<LayoutProps> = ({ 
-  children, 
-  activeTab, 
-  onTabChange, 
-  currentUser, 
+interface NavItem {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+  color: string;
+}
+
+const navItems: NavItem[] = [
+  { id: 'dashboard', label: '概览', icon: Home, color: '#4A90E2' },
+  { id: 'library_hub', label: '图书馆', icon: Library, color: '#A78BFA' },
+  { id: 'capture', label: '拍题', icon: Camera, color: '#5FD4A0' },
+  { id: 'tutor', label: 'AI 导师', icon: Mic, color: '#FB7185' },
+  { id: 'study_room', label: '自习室', icon: GraduationCap, color: '#10B981' },
+  { id: 'vault', label: '档案库', icon: FileText, color: '#FFB84D' },
+];
+
+// 移动端主要入口（前5个）
+const mobileNavItems = navItems.slice(0, 5);
+
+const Layout: React.FC<LayoutProps> = ({
+  children,
+  activeTab,
+  onTabChange,
+  currentUser,
   availableUsers,
-  onSwitchUser 
+  onSwitchUser
 }) => {
-  const navItems = [
-    { id: 'dashboard', icon: 'fa-chart-pie', label: '看板' },
-    { id: 'library_hub', icon: 'fa-book-atlas', label: '图书馆' },
-    { id: 'capture', icon: 'fa-camera', label: '拍题' },
-    { id: 'tutor', icon: 'fa-user-graduate', label: 'AI 导师' }, // Added Tutor Tab
-    { id: 'study_room', icon: 'fa-laptop-code', label: '自习室' },
-    { id: 'vault', icon: 'fa-folder-tree', label: '档案库' },
-  ];
-
   return (
-    <div className="h-screen w-screen bg-gray-100 flex flex-col md:flex-row overflow-hidden">
-      {/* Mobile Header */}
-      <div className="md:hidden bg-slate-900 text-white pt-[env(safe-area-inset-top)] pb-2 px-4 shadow-md z-50 flex-shrink-0">
-        <div className="flex justify-between items-center h-12">
-          <h1 className="font-bold text-base flex items-center">
-            <i className="fa-solid fa-brain mr-2 text-brand-500"></i> 
-            <span>智学 OS</span>
-          </h1>
-          <button onClick={() => {
-               const nextIndex = (availableUsers.findIndex(u => u.id === currentUser.id) + 1) % availableUsers.length;
-               onSwitchUser(availableUsers[nextIndex].id);
-             }} className="bg-slate-800 text-white rounded-full px-3 py-1 flex items-center text-xs border border-slate-700">
-               {currentUser.avatar} <span className="ml-2">{currentUser.name}</span>
-          </button>
-        </div>
-      </div>
+    <div className="h-screen w-screen bg-gradient-to-b from-gray-50 to-paper flex flex-col overflow-hidden">
+      {/* 顶部导航栏（所有设备） */}
+      <header className="fixed top-0 w-full h-16 backdrop-blur-md bg-white/80 border-b border-gray-200 z-50 transition-shadow">
+        <div className="h-full px-4 md:px-6 flex items-center justify-between max-w-7xl mx-auto">
+          {/* 左侧：Logo */}
+          <div
+            className="flex items-center gap-3 cursor-pointer"
+            onClick={() => onTabChange('dashboard')}
+          >
+            <div className="w-8 h-8 bg-gradient-to-br from-sky-500 to-mint-400 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+              智
+            </div>
+            <span className="text-lg font-semibold text-gray-800 hidden sm:block">智学 OS</span>
+          </div>
 
-      {/* Sidebar (Desktop) */}
-      <aside className="hidden md:flex flex-col w-64 bg-slate-950 text-white h-full flex-shrink-0 shadow-2xl relative z-20">
-        <div className="p-6 border-b border-slate-800">
-          <h1 className="font-black text-xl tracking-tight flex items-center">
-            <i className="fa-solid fa-brain mr-3 text-brand-500 animate-pulse"></i>
-            智学 OS
+          {/* 中间：页面标题（仅移动端） */}
+          <h1 className="md:hidden font-medium text-gray-700">
+            {navItems.find(item => item.id === activeTab)?.label || '智学 OS'}
           </h1>
-        </div>
-        
-        <div className="p-4 border-b border-slate-900">
-          <div className="flex items-center space-x-3 bg-slate-900/50 p-3 rounded-2xl border border-slate-800">
-             <span className="text-2xl">{currentUser.avatar}</span>
-             <div className="min-w-0">
-                <div className="font-black text-sm truncate">{currentUser.name}</div>
-                <div className="text-[10px] text-slate-500 uppercase tracking-widest">{currentUser.grade}</div>
-             </div>
+
+          {/* 右侧：用户切换 */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                const nextIndex = (availableUsers.findIndex(u => u.id === currentUser.id) + 1) % availableUsers.length;
+                onSwitchUser(availableUsers[nextIndex].id);
+              }}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors cursor-pointer"
+            >
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-sky-400 to-mint-400 flex items-center justify-center text-white font-medium text-sm">
+                {currentUser.name[0]}
+              </div>
+              <span className="font-medium text-gray-700 hidden sm:block">{currentUser.name}</span>
+            </button>
           </div>
         </div>
+      </header>
 
-        <nav className="flex-1 p-4 space-y-2 overflow-y-auto custom-scrollbar">
-          {navItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => onTabChange(item.id)}
-              className={`w-full flex items-center p-3.5 rounded-2xl transition-all duration-300 group ${
-                activeTab === item.id
-                  ? 'bg-brand-500 text-white shadow-xl shadow-brand-500/20'
-                  : 'text-slate-400 hover:bg-slate-900 hover:text-white'
-              }`}
-            >
-              <i className={`fa-solid ${item.icon} w-8 text-center text-lg`}></i>
-              <span className="font-bold text-sm tracking-wide">{item.label}</span>
-            </button>
-          ))}
-        </nav>
-        
-        <div className="p-4 bg-slate-900/30 border-t border-slate-900">
-           <div className="flex justify-between items-center text-[9px] font-black text-slate-500 uppercase tracking-tighter">
-             <span>Gemini Cloud Index</span>
-             <span className="text-emerald-500">Live</span>
-           </div>
-           <div className="mt-2 h-1 w-full bg-slate-800 rounded-full overflow-hidden">
-              <div className="h-full bg-emerald-500 w-[92%]"></div>
-           </div>
+      {/* 侧边栏导航（桌面端） */}
+      <nav className="hidden md:block fixed left-0 top-16 w-70 h-[calc(100vh-4rem)] bg-white border-r border-gray-200 overflow-y-auto z-40">
+        <div className="p-4 space-y-2">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
+
+            return (
+              <button
+                key={item.id}
+                onClick={() => onTabChange(item.id)}
+                className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200
+                  ${isActive
+                    ? 'bg-sky-50 border-l-4 border-sky-500 font-medium text-sky-700'
+                    : 'hover:bg-gray-50 text-gray-700'
+                  }`}
+              >
+                <div
+                  className="w-10 h-10 rounded-full flex items-center justify-center"
+                  style={{
+                    backgroundColor: isActive ? item.color + '30' : item.color + '20',
+                    color: item.color
+                  }}
+                >
+                  <Icon size={20} />
+                </div>
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
         </div>
-      </aside>
-
-      {/* Mobile Bottom Nav */}
-      <nav className="md:hidden fixed bottom-0 left-0 w-full bg-white border-t border-gray-100 flex justify-around p-2 z-50 safe-pb">
-        {navItems.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => onTabChange(item.id)}
-            className={`flex flex-col items-center p-2 rounded-xl w-full ${
-              activeTab === item.id ? 'text-brand-500' : 'text-slate-400'
-            }`}
-          >
-            <i className={`fa-solid ${item.icon} text-lg mb-1`}></i>
-            <span className="text-[9px] font-bold">{item.label}</span>
-          </button>
-        ))}
       </nav>
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-y-auto bg-slate-50 relative w-full custom-scrollbar">
-        <div className="p-4 pb-24 md:p-10 md:pb-10 max-w-7xl mx-auto min-h-full">
-           {children}
+      {/* 底部导航栏（移动端） */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-18 bg-white border-t border-gray-200 z-50 safe-area-bottom">
+        <div className="flex justify-around items-center h-full px-2">
+          {mobileNavItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
+
+            return (
+              <button
+                key={item.id}
+                onClick={() => onTabChange(item.id)}
+                className="flex flex-col items-center justify-center gap-1 px-3 py-2 min-w-0 flex-1"
+              >
+                <Icon
+                  size={24}
+                  className={`transition-all duration-200 ${
+                    isActive ? 'scale-120' : 'scale-100'
+                  }`}
+                  style={{ color: isActive ? item.color : '#9CA3AF' }}
+                />
+                <span
+                  className={`text-xs transition-all duration-200 truncate max-w-full ${
+                    isActive ? 'font-semibold' : 'font-normal'
+                  }`}
+                  style={{ color: isActive ? item.color : '#9CA3AF' }}
+                >
+                  {item.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+
+      {/* 主内容区 */}
+      <main className="pt-16 pb-20 md:pb-8 md:pl-70 min-h-screen overflow-y-auto">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
+          {children}
         </div>
       </main>
     </div>
