@@ -31,9 +31,10 @@
 - **智能索引**:
   - 自动向量化图书内容到 AnythingLLM
   - 支持语义搜索和 RAG 检索
-- **本地存储**:
-  - 使用 IndexedDB 存储图书数据
-  - 数据完全在本地，保护隐私
+- **服务端存储**:
+  - 教材文件保存在服务器 `/opt/hl-os/data/originals/books/`
+  - 元数据索引支持跨设备同步
+  - 数据持久化，不会因浏览器清理而丢失
 - **分类筛选**:
   - 按学科、类别、年级筛选
   - 全文搜索（书名、作者、标签）
@@ -101,7 +102,7 @@
 - **构建工具**: Vite 5.0
 - **样式**: Tailwind CSS (Utility-first)
 - **图标**: Lucide React
-- **存储**: IndexedDB (图书、用户数据本地缓存)
+- **数据存储**: 服务端 API + 文件系统（见下方数据架构）
 
 #### 后端
 - **运行时**: Node.js 20 + Express
@@ -111,6 +112,21 @@
   - `epub2` - EPUB 解析
   - `multer` - 文件上传
 - **日志**: Winston
+
+#### 数据存储架构（三层存储）
+- **层级1**: AnythingLLM (LanceDB 向量数据库)
+  - 用途: RAG检索、语义搜索
+  - 存储: 文本内容向量化 + 文件路径元数据
+  - 配置: Gemini text-embedding-004
+- **层级2**: Obsidian文件夹 (`/opt/hl-os/data/obsidian/`)
+  - `Wrong_Problems/` - 错题本 Markdown
+  - `No_Problems/` - 试卷作业 Markdown
+  - `Courses/` - 课件测验 Markdown
+- **层级3**: 原始文件目录 (`/opt/hl-os/data/originals/`)
+  - `images/` - 原始图片（按月归档）
+  - `books/` - 电子教材 PDF/EPUB
+
+**资源占用**: ~2.5GB（1000份文档 + 100个PDF教材）
 
 #### AI & 向量数据库
 - **LLM**: Google Gemini 3 (Flash + Pro)
