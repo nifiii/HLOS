@@ -2,6 +2,7 @@
 import React, { useState, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import { analyzeImage } from '../services/geminiService';
+import { saveScannedItemToServer } from '../services/apiService';
 import { ProcessingStatus, ScannedItem, UserProfile, DocType, ProblemStatus } from '../types';
 import { Button, LoadingSpinner, Card, Badge } from './ui';
 import { Camera, Upload, CheckCircle } from 'lucide-react';
@@ -14,6 +15,8 @@ interface CaptureModuleProps {
 
 const CaptureModule: React.FC<CaptureModuleProps> = ({ onScanComplete, currentUser }) => {
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [reviewItem, setReviewItem] = useState<ScannedItem | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -53,21 +56,44 @@ const CaptureModule: React.FC<CaptureModuleProps> = ({ onScanComplete, currentUs
     }
   };
 
-  const handleSaveAndArchive = () => {
-    if (reviewItem) {
-      onScanComplete(reviewItem);
+  const handleSaveAndArchive = async () => {
+    if (reviewItem && preview) {
+      try {
+        setIsSaving(true);
+        setSaveError(null);
 
-      // 触发成功动画
-      confetti({
-        particleCount: 100,
-        spread: 70,
-        origin: { y: 0.6 },
-        colors: ['#4A90E2', '#5FD4A0', '#FFB84D']
-      });
+        // 1. 保存到服务器（文件系统 + AnythingLLM）
+        const paths = await saveScannedItemToServer(reviewItem, preview);
 
-      setPreview(null);
-      setReviewItem(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+        // 2. 添加文件路径到数据
+        const savedItem: ScannedItem = {
+          ...reviewItem,
+          mdPath: paths.mdPath,
+          imagePath: paths.imagePath,
+        };
+
+        // 3. 触发父组件回调
+        onScanComplete(savedItem);
+
+        // 4. 触发成功动画
+        confetti({
+          particleCount: 100,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ['#4A90E2', '#5FD4A0', '#FFB84D']
+        });
+
+        // 5. 重置界面
+        setPreview(null);
+        setReviewItem(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+
+      } catch (error: any) {
+        console.error('保存失败:', error);
+        setSaveError(error.message || '保存到服务器失败，请重试');
+      } finally {
+        setIsSaving(false);
+      }
     }
   };
 
@@ -167,13 +193,26 @@ const CaptureModule: React.FC<CaptureModuleProps> = ({ onScanComplete, currentUs
 
         {/* 底部按钮 */}
         <div className="sticky bottom-4 flex gap-4">
+          {saveError && (
+            <div className="flex-1 bg-red-50 text-red-600 px-4 py-3 rounded-xl border border-red-200 text-sm">
+              {saveError}
+            </div>
+          )}
           <Button
             variant="primary"
             size="lg"
             className="flex-1"
             onClick={handleSaveAndArchive}
+            disabled={isSaving}
           >
-            保存到知识库
+            {isSaving ? (
+              <>
+                <LoadingSpinner size="sm" className="mr-2" />
+                保存中...
+              </>
+            ) : (
+              '保存到知识库'
+            )}
           </Button>
           <Button
             variant="outline"

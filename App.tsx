@@ -10,7 +10,7 @@ import LibraryHub from './components/LibraryHub';
 import StudyRoom from './components/StudyRoom';
 import LiveTutor from './components/LiveTutor';
 import { ScannedItem, UserProfile, EBook } from './types';
-import { getAllBooks } from './services/bookStorage';
+import { fetchBooks, fetchScannedItems } from './services/apiService';
 
 const FAMILY_PROFILES: UserProfile[] = [
   { id: 'child_1', name: '大宝', avatar: '👦', grade: '高中二年级' },
@@ -25,34 +25,67 @@ const App: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showTutor, setShowTutor] = useState(false);
 
-  // 加载图书数据
+  // 加载图书数据（从服务器）
   useEffect(() => {
     const loadBooks = async () => {
       try {
-        const allBooks = await getAllBooks();
+        const allBooks = await fetchBooks({ ownerId: currentUser.id });
         setBooks(allBooks);
       } catch (error) {
         console.error('加载图书失败:', error);
+        setErrorMsg('从服务器加载图书失败，请检查网络连接');
       }
     };
     loadBooks();
-  }, []);
+  }, [currentUser.id]);
 
-  // 🔧 修复：切换标签页时重新加载图书数据（确保数据同步）
+  // 加载扫描项数据（从服务器）
   useEffect(() => {
-    const reloadBooksOnTabSwitch = async () => {
+    const loadScannedItems = async () => {
+      try {
+        const items = await fetchScannedItems({ ownerId: currentUser.id });
+        // 转换为 ScannedItem 格式
+        const scannedItemData: ScannedItem[] = items.map((item: any) => ({
+          id: item.id,
+          ownerId: item.ownerId,
+          timestamp: item.timestamp,
+          imageUrl: item.imagePath || '', // 使用服务端文件路径
+          rawMarkdown: '', // 稍后按需加载
+          mdPath: item.mdPath,
+          imagePath: item.imagePath,
+          meta: {
+            type: item.meta.type as any,
+            subject: item.meta.subject,
+            chapter_hint: item.meta.chapter,
+            knowledge_status: 'unknown',
+            problems: [],
+          },
+          status: 'processed' as const,
+        }));
+        setScannedItems(scannedItemData);
+      } catch (error) {
+        console.error('加载扫描项失败:', error);
+        // 不显示错误提示，静默失败
+      }
+    };
+    loadScannedItems();
+  }, [currentUser.id]);
+
+  // 切换标签页时刷新数据（确保数据同步）
+  useEffect(() => {
+    const refreshDataOnTabSwitch = async () => {
       // 当切换到自习室或图书馆时，重新加载图书列表
       if (activeTab === 'study_room' || activeTab === 'library_hub') {
         try {
-          const allBooks = await getAllBooks();
+          const allBooks = await fetchBooks({ ownerId: currentUser.id });
           setBooks(allBooks);
         } catch (error) {
           console.error('重新加载图书失败:', error);
         }
       }
     };
-    reloadBooksOnTabSwitch();
-  }, [activeTab]);
+    refreshDataOnTabSwitch();
+  }, [activeTab, currentUser.id]);
 
   // 自动清除错误消息
   useEffect(() => {
