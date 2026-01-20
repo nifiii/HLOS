@@ -197,7 +197,24 @@ echo "🐳 启动 AnythingLLM 容器..."
 # 停止旧容器
 docker-compose -f docker-compose.anythingllm.yml down 2>/dev/null || true
 
+# 确保存储目录存在（已在步骤4创建，这里再次确认）
+mkdir -p $INSTALL_DIR/anythingllm-storage
+mkdir -p $INSTALL_DIR/anythingllm-hotdir
+
+# 🔧 修复：预创建数据库文件并设置权限（解决 Prisma "unable to open database file" 错误）
+echo "   → 预创建数据库文件..."
+touch $INSTALL_DIR/anythingllm-storage/anythingllm.db
+touch $INSTALL_DIR/anythingllm-storage/anythingllm.db-journal 2>/dev/null || true
+
+# 设置宽松权限（容器内使用 UID 1000 或 root）
+echo "   → 设置存储目录权限..."
+chmod 777 $INSTALL_DIR/anythingllm-storage
+chmod 777 $INSTALL_DIR/anythingllm-hotdir
+chmod 666 $INSTALL_DIR/anythingllm-storage/anythingllm.db
+[ -f $INSTALL_DIR/anythingllm-storage/anythingllm.db-journal ] && chmod 666 $INSTALL_DIR/anythingllm-storage/anythingllm.db-journal
+
 # 启动新容器
+echo "   → 启动容器..."
 docker-compose -f docker-compose.anythingllm.yml up -d
 
 echo -e "${GREEN}✅ AnythingLLM 容器启动完成${NC}"

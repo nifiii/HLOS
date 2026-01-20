@@ -81,7 +81,31 @@ docker-compose down 2>/dev/null || true
 echo ""
 
 # ================================
-# 4. 启动服务
+# 4. 准备 AnythingLLM 存储目录
+# ================================
+echo "📁 准备 AnythingLLM 存储目录..."
+
+# 创建存储目录
+mkdir -p ./anythingllm-storage
+mkdir -p ./anythingllm-hotdir
+
+# 🔧 修复：预创建数据库文件并设置权限（解决 Prisma "unable to open database file" 错误）
+echo "   → 预创建数据库文件..."
+touch ./anythingllm-storage/anythingllm.db
+touch ./anythingllm-storage/anythingllm.db-journal 2>/dev/null || true
+
+# 设置宽松权限（Docker 容器内可能使用不同 UID）
+echo "   → 设置存储目录权限..."
+chmod 777 ./anythingllm-storage
+chmod 777 ./anythingllm-hotdir
+chmod 666 ./anythingllm-storage/anythingllm.db
+[ -f ./anythingllm-storage/anythingllm.db-journal ] && chmod 666 ./anythingllm-storage/anythingllm.db-journal
+
+echo -e "${GREEN}✅ 存储目录准备完成${NC}"
+echo ""
+
+# ================================
+# 5. 启动服务
 # ================================
 echo "🐳 启动 Docker 容器..."
 docker-compose up -d --build
@@ -91,7 +115,7 @@ echo "⏳ 等待服务启动..."
 sleep 15
 
 # ================================
-# 5. 健康检查
+# 6. 健康检查
 # ================================
 echo ""
 echo "🏥 执行健康检查..."
@@ -135,7 +159,7 @@ else
 fi
 
 # ================================
-# 6. 部署总结
+# 7. 部署总结
 # ================================
 echo ""
 echo "======================================"
