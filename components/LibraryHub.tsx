@@ -6,7 +6,7 @@ import { BookUploader } from './BookUploader';
 import { BookMetadataEditor } from './BookMetadataEditor';
 import { BookCard } from './BookCard';
 import { getAllBooks, saveBook, deleteBook, getBooksByOwnerId } from '../services/bookStorage';
-import { Button, Card, LoadingSpinner, Input } from './ui';
+import { Button, Card, LoadingSpinner, Input, Skeleton } from './ui';
 
 interface LibraryHubProps {
   currentUserId: string;
@@ -237,13 +237,22 @@ const LibraryHub: React.FC<LibraryHubProps> = ({ currentUserId }) => {
 
       {/* 图书网格 */}
       {loading ? (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="flex flex-col items-center justify-center min-h-[60vh]"
-        >
-          <LoadingSpinner size={48} text="加载图书中..." />
-        </motion.div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {[...Array(8)].map((_, index) => (
+            <Card key={index} className="p-0 overflow-hidden">
+              <Skeleton variant="rectangular" height={200} className="rounded-t-lg" />
+              <div className="p-4 space-y-3">
+                <Skeleton variant="text" width="80%" height={24} />
+                <Skeleton variant="text" width="60%" />
+                <div className="flex gap-2">
+                  <Skeleton variant="text" width={60} height={24} />
+                  <Skeleton variant="text" width={80} height={24} />
+                </div>
+                <Skeleton variant="text" width="100%" />
+              </div>
+            </Card>
+          ))}
+        </div>
       ) : filteredBooks.length === 0 ? (
         <motion.div
           initial={{ opacity: 0 }}
