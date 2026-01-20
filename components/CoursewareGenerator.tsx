@@ -7,6 +7,7 @@ interface CoursewareGeneratorProps {
   selectedBook: EBook;
   selectedChapter: ChapterNode;
   wrongProblems: ScannedItem[]; // 用于 RAG 上下文
+  studentName: string; // 学生姓名
   onBack: () => void;
 }
 
@@ -50,6 +51,7 @@ export const CoursewareGenerator: React.FC<CoursewareGeneratorProps> = ({
   selectedBook,
   selectedChapter,
   wrongProblems,
+  studentName,
   onBack,
 }) => {
   const [selectedStyle, setSelectedStyle] = useState<TeachingStyle>('rigorous');
@@ -69,8 +71,9 @@ export const CoursewareGenerator: React.FC<CoursewareGeneratorProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           bookTitle: selectedBook.title,
+          chapter: selectedChapter.title, // 修复：使用 chapter 而不是 chapterTitle
+          studentName, // 修复：添加学生姓名
           subject: selectedBook.subject,
-          chapterTitle: selectedChapter.title,
           teachingStyle: selectedStyle,
           wrongProblems: wrongProblems.slice(0, 10), // 最多传递10个错题
         }),
@@ -82,7 +85,8 @@ export const CoursewareGenerator: React.FC<CoursewareGeneratorProps> = ({
         throw new Error(result.error || '生成失败');
       }
 
-      setCourseware(result.data.markdown);
+      // 修复：后端返回的是 result.data（字符串），不是 result.data.markdown
+      setCourseware(result.data);
     } catch (err) {
       console.error('生成课件失败:', err);
       const message = err instanceof Error ? err.message : '生成失败，请重试';

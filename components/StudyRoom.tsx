@@ -153,6 +153,7 @@ const StudyRoom: React.FC<StudyRoomProps> = ({ currentUser, books, wrongProblems
             selectedBook={selectedBook}
             selectedChapter={selectedChapter}
             wrongProblems={relevantWrongProblems}
+            studentName={currentUser.name} // 修复：传递学生姓名
             onBack={handleBackToSelect}
           />
 
