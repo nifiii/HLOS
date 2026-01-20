@@ -1,9 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { GraduationCap, BookOpen, FileText, ClipboardCheck } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { UserProfile, EBook, ChapterNode, ScannedItem } from '../types';
 import { ChapterSelector } from './ChapterSelector';
 import { CoursewareGenerator } from './CoursewareGenerator';
 import { QuizGenerator } from './QuizGenerator';
+import { Button, Card } from './ui';
 
 interface StudyRoomProps {
   currentUser: UserProfile;
@@ -60,7 +62,7 @@ const StudyRoom: React.FC<StudyRoomProps> = ({ currentUser, books, wrongProblems
     ];
 
     return (
-      <div className="flex items-center justify-center gap-2 mb-8">
+      <div className="flex items-center justify-center gap-2 mb-8 flex-wrap">
         {steps.map((step, index) => {
           const Icon = step.icon;
           const isActive = currentStep === step.key;
@@ -70,18 +72,21 @@ const StudyRoom: React.FC<StudyRoomProps> = ({ currentUser, books, wrongProblems
 
           return (
             <React.Fragment key={step.key}>
-              <div
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: index * 0.1 }}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
                   isActive
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-sky-500 text-white shadow-md'
                     : isCompleted
-                    ? 'bg-green-100 text-green-700'
+                    ? 'bg-mint-100 text-mint-600'
                     : 'bg-gray-100 text-gray-500'
                 }`}
               >
                 <Icon className="w-4 h-4" />
                 <span className="text-sm font-medium">{step.label}</span>
-              </div>
+              </motion.div>
               {index < steps.length - 1 && (
                 <div className="w-8 h-0.5 bg-gray-300"></div>
               )}
@@ -95,19 +100,27 @@ const StudyRoom: React.FC<StudyRoomProps> = ({ currentUser, books, wrongProblems
   return (
     <div className="space-y-6 animate-fade-in">
       {/* 顶部标题 */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-2xl p-8 shadow-lg">
-        <div className="flex items-center justify-between">
+      <div className="bg-gradient-to-r from-sky-400 to-mint-400 text-white rounded-3xl p-8 shadow-card relative overflow-hidden">
+        {/* 装饰元素 */}
+        <div className="absolute top-0 right-0 opacity-20 pointer-events-none">
+          <svg width="200" height="200" viewBox="0 0 200 200" fill="none">
+            <circle cx="150" cy="50" r="40" fill="white" />
+            <circle cx="100" cy="80" r="25" fill="white" />
+          </svg>
+        </div>
+
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 relative z-10">
           <div>
             <div className="flex items-center gap-3 mb-2">
               <GraduationCap className="w-10 h-10" />
               <h2 className="text-3xl font-bold">AI 学习园地</h2>
             </div>
-            <p className="text-blue-100 text-sm">
+            <p className="text-sky-50 text-sm">
               为 {currentUser.name} 定制的个性化学习内容
             </p>
           </div>
           <div className="text-right">
-            <div className="text-sm text-blue-100 mb-1">当前年级</div>
+            <div className="text-sm text-sky-100 mb-1">当前年级</div>
             <div className="text-2xl font-bold">{currentUser.grade}</div>
           </div>
         </div>
@@ -145,13 +158,15 @@ const StudyRoom: React.FC<StudyRoomProps> = ({ currentUser, books, wrongProblems
 
           {/* 继续下一步按钮（课件生成后显示） */}
           <div className="mt-6 flex justify-center">
-            <button
+            <Button
+              variant="success"
+              size="lg"
+              icon={ClipboardCheck}
               onClick={() => setCurrentStep('quiz')}
-              className="flex items-center gap-2 px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium shadow-lg"
+              className="shadow-lg"
             >
-              <ClipboardCheck className="w-5 h-5" />
               继续生成配套测验
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -166,32 +181,43 @@ const StudyRoom: React.FC<StudyRoomProps> = ({ currentUser, books, wrongProblems
           />
 
           {/* 完成按钮 */}
-          <div className="mt-6 flex justify-center gap-4">
-            <button
+          <div className="mt-6 flex justify-center gap-4 flex-wrap">
+            <Button
+              variant="outline"
+              size="lg"
               onClick={handleBackToSelect}
-              className="px-8 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
             >
               返回首页
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="primary"
+              size="lg"
               onClick={() => setCurrentStep('courseware')}
-              className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
             >
               返回课件
-            </button>
+            </Button>
           </div>
         </div>
       )}
 
       {/* 提示信息（选择步骤且无图书时） */}
       {currentStep === 'select' && books.length === 0 && (
-        <div className="text-center py-12">
-          <BookOpen className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-600 mb-2">您的图书馆还没有教材</p>
-          <p className="text-sm text-gray-500">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex flex-col items-center justify-center min-h-[50vh]"
+        >
+          <div className="relative w-80 h-80 mb-8">
+            <div className="absolute inset-0 bg-gradient-to-br from-sky-100 to-mint-100 rounded-3xl opacity-50" />
+            <div className="absolute inset-8 flex items-center justify-center">
+              <BookOpen size={120} className="text-sky-300" />
+            </div>
+          </div>
+          <h2 className="text-2xl font-semibold mb-2">图书馆还没有教材</h2>
+          <p className="text-gray-600 mb-4">
             请先前往「图书馆」上传您的电子教材
           </p>
-        </div>
+        </motion.div>
       )}
     </div>
   );
