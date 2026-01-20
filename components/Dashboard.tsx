@@ -1,7 +1,9 @@
 import React from 'react';
 import { ScannedItem, DocType, UserProfile } from '../types';
 import { Card, CardHeader, Badge, Button } from './ui';
-import { TrendingUp, Calendar, Clock, Award, Target, BookOpen, Camera, Library, GraduationCap, FileText } from 'lucide-react';
+import { TrendingUp, Calendar, Clock, Award, Target, BookOpen, Camera, Library, GraduationCap, FileText, AlertCircle } from 'lucide-react';
+import { useDashboardStats } from '../hooks/useDashboardStats';
+import { TrendChart } from './TrendChart';
 
 interface DashboardProps {
   items: ScannedItem[];
@@ -9,45 +11,9 @@ interface DashboardProps {
   onTabChange: (tab: string) => void;
 }
 
-interface StatCard {
-  label: string;
-  value: number;
-  icon: any;
-  color: string;
-  trend?: number;
-}
-
 const Dashboard: React.FC<DashboardProps> = ({ items, currentUser, onTabChange }) => {
-  const stats: StatCard[] = [
-    {
-      label: '总收录数',
-      value: items.length,
-      icon: BookOpen,
-      color: '#4A90E2',
-      trend: 12
-    },
-    {
-      label: '待复习数',
-      value: items.filter(i => i.meta.type === DocType.WRONG_PROBLEM).length,
-      icon: Clock,
-      color: '#FFB84D',
-      trend: -5
-    },
-    {
-      label: '本周学习',
-      value: 15,
-      icon: Target,
-      color: '#FB7185',
-      trend: 8
-    },
-    {
-      label: '掌握率',
-      value: Math.round((items.filter(i => i.meta.type === DocType.NOTE).length / items.length) * 100) || 0,
-      icon: Award,
-      color: '#10B981',
-      trend: 3
-    },
-  ];
+  // 使用实时统计 Hook
+  const stats = useDashboardStats(items);
 
   const recentActivities = items.slice(0, 5).map(item => ({
     time: new Date(item.timestamp).toLocaleString('zh-CN', {
@@ -132,30 +98,83 @@ const Dashboard: React.FC<DashboardProps> = ({ items, currentUser, onTabChange }
         </div>
       </section>
 
-      {/* 统计卡片 */}
+      {/* 4个统计卡片 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {stats.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <Card key={stat.label} hover className="p-6">
-              <div
-                className="w-12 h-12 rounded-full mb-3 flex items-center justify-center"
-                style={{ backgroundColor: stat.color + '20' }}
-              >
-                <Icon style={{ color: stat.color }} size={24} />
-              </div>
-              <div className="text-3xl font-bold mb-1">{stat.value}{stat.label === '掌握率' ? '%' : ''}</div>
-              <div className="text-sm text-gray-600 mb-2">{stat.label}</div>
-              {stat.trend !== undefined && (
-                <div className={`flex items-center gap-1 text-xs ${stat.trend > 0 ? 'text-mint-500' : 'text-red-500'}`}>
-                  <TrendingUp size={14} className={stat.trend < 0 ? 'rotate-180' : ''} />
-                  <span>{Math.abs(stat.trend)}%</span>
-                </div>
-              )}
-            </Card>
-          );
-        })}
+        <Card hover className="p-6">
+          <div className="w-12 h-12 rounded-full mb-3 flex items-center justify-center bg-blue-100">
+            <BookOpen className="w-6 h-6 text-blue-500" />
+          </div>
+          <div className="text-3xl font-bold mb-1">{stats.todayCount}</div>
+          <div className="text-sm text-gray-600 mb-2">今日收录</div>
+          {stats.todayCount > 0 && (
+            <div className="flex items-center gap-1 text-xs text-green-500">
+              <TrendingUp size={14} />
+              <span>新增</span>
+            </div>
+          )}
+        </Card>
+
+        <Card hover className="p-6">
+          <div className="w-12 h-12 rounded-full mb-3 flex items-center justify-center bg-green-100">
+            <Calendar className="w-6 h-6 text-green-500" />
+          </div>
+          <div className="text-3xl font-bold mb-1">{stats.weekCount}</div>
+          <div className="text-sm text-gray-600 mb-2">本周收录</div>
+          <div className="flex items-center gap-1 text-xs text-green-500">
+            <TrendingUp size={14} />
+            <span>7天</span>
+          </div>
+        </Card>
+
+        <Card hover className="p-6">
+          <div className="w-12 h-12 rounded-full mb-3 flex items-center justify-center bg-red-100">
+            <AlertCircle className="w-6 h-6 text-red-500" />
+          </div>
+          <div className="text-3xl font-bold mb-1">{stats.totalWrong}</div>
+          <div className="text-sm text-gray-600 mb-2">待复习（错题）</div>
+        </Card>
+
+        <Card hover className="p-6">
+          <div
+            className="w-12 h-12 rounded-full mb-3 flex items-center justify-center"
+            style={{
+              backgroundColor: stats.masteryRate >= 80 ? '#10B98120' :
+                             stats.masteryRate >= 60 ? '#FFB84D20' : '#EF444420'
+            }}
+          >
+            <Target
+              className="w-6 h-6"
+              style={{
+                color: stats.masteryRate >= 80 ? '#10B981' :
+                       stats.masteryRate >= 60 ? '#F59E0B' : '#EF4444'
+              }}
+            />
+          </div>
+          <div className="text-3xl font-bold mb-1">{stats.masteryRate}%</div>
+          <div className="text-sm text-gray-600 mb-2">掌握率</div>
+          <div className={`flex items-center gap-1 text-xs ${
+            stats.masteryRate >= 80 ? 'text-green-500' :
+            stats.masteryRate >= 60 ? 'text-yellow-500' : 'text-red-500'
+          }`}>
+            <TrendingUp
+              size={14}
+              className={stats.masteryRate < 60 ? 'rotate-180' : ''}
+            />
+            <span>{stats.masteryRate >= 80 ? '优秀' : stats.masteryRate >= 60 ? '良好' : '需努力'}</span>
+          </div>
+        </Card>
       </div>
+
+      {/* 最近7天学习趋势 */}
+      <Card>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-bold text-gray-800">最近7天学习趋势</h3>
+            <p className="text-sm text-gray-500">每日收录数量</p>
+          </div>
+        </div>
+        <TrendChart data={stats.last7Days} />
+      </Card>
 
       {/* 最近学习 */}
       <Card>
