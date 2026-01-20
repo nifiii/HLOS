@@ -43,6 +43,15 @@ router.post('/generate-courseware', async (req: Request, res: Response, next: Ne
   } catch (error: any) {
     console.error("Gemini API Error:", error);
 
+    // 处理 Gemini API 配额超限错误（429）
+    if (error.status === 429 || error.code === 429) {
+      return res.status(429).json({
+        success: false,
+        error: "API 配额已耗尽：Gemini API 调用频率或配额超限，请稍后重试或升级套餐。"
+      });
+    }
+
+    // 处理网络连接错误
     const msg = (error.message || "").toLowerCase();
     if (
       msg.includes("fetch") ||
@@ -58,6 +67,7 @@ router.post('/generate-courseware', async (req: Request, res: Response, next: Ne
       });
     }
 
+    // 处理认证错误
     if (error.status === 403 || error.status === 401) {
       return res.status(403).json({
         success: false,
@@ -65,6 +75,7 @@ router.post('/generate-courseware', async (req: Request, res: Response, next: Ne
       });
     }
 
+    // 其他未知错误
     next(error);
   }
 });

@@ -71,13 +71,41 @@ export const CoursewareGenerator: React.FC<CoursewareGeneratorProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           bookTitle: selectedBook.title,
-          chapter: selectedChapter.title, // 修复：使用 chapter 而不是 chapterTitle
-          studentName, // 修复：添加学生姓名
+          chapter: selectedChapter.title,
+          studentName,
           subject: selectedBook.subject,
           teachingStyle: selectedStyle,
-          wrongProblems: wrongProblems.slice(0, 10), // 最多传递10个错题
+          wrongProblems: wrongProblems.slice(0, 10),
         }),
       });
+
+      // 优化错误处理：检查响应状态
+      if (!response.ok) {
+        const contentType = response.headers.get('content-type');
+
+        // 如果返回的是 JSON 错误
+        if (contentType?.includes('application/json')) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        // 如果返回的是 HTML 错误页面（nginx 404/500等）
+        const htmlText = await response.text();
+
+        if (response.status === 404) {
+          throw new Error('❌ API 接口未找到 - 请确认后端服务已正确部署并启动');
+        } else if (response.status === 429) {
+          throw new Error('⏱️ API 调用频率超限 - Gemini API 配额已耗尽，请稍后重试或升级套餐');
+        } else if (response.status === 503) {
+          throw new Error('🔌 网络连接失败 - 无法连接到 Gemini API，请检查网络或防火墙设置');
+        } else if (response.status === 403 || response.status === 401) {
+          throw new Error('🔑 API 认证失败 - API Key 无效或已过期，请检查服务器配置');
+        } else if (response.status >= 500) {
+          throw new Error(`🚨 服务器错误 (${response.status}) - 请联系管理员或查看后端日志`);
+        } else {
+          throw new Error(`⚠️ 请求失败 (${response.status}): ${response.statusText}`);
+        }
+      }
 
       const result = await response.json();
 
@@ -85,7 +113,6 @@ export const CoursewareGenerator: React.FC<CoursewareGeneratorProps> = ({
         throw new Error(result.error || '生成失败');
       }
 
-      // 修复：后端返回的是 result.data（字符串），不是 result.data.markdown
       setCourseware(result.data);
     } catch (err) {
       console.error('生成课件失败:', err);
