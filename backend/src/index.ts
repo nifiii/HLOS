@@ -6,6 +6,10 @@ import coursewareRouter from './routes/courseware.js';
 import assessmentRouter from './routes/assessment.js';
 import anythingllmRouter from './routes/anythingllm.js';
 import uploadBookRouter from './routes/upload-book.js';
+import saveScannedItemRouter from './routes/saveScannedItem.js';
+import scannedItemsRouter from './routes/scannedItems.js';
+import saveBookRouter from './routes/saveBook.js';
+import booksRouter from './routes/books.js';
 
 dotenv.config();
 
@@ -38,6 +42,10 @@ app.use('/api', coursewareRouter);
 app.use('/api', assessmentRouter);
 app.use('/api/anythingllm', anythingllmRouter);
 app.use('/api', uploadBookRouter);
+app.use('/api', saveScannedItemRouter);
+app.use('/api', scannedItemsRouter);
+app.use('/api', saveBookRouter);
+app.use('/api', booksRouter);
 
 // 404 处理
 app.use((req, res) => {
