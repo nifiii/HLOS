@@ -57,3 +57,54 @@ body {
   border: none;
   box-shadow: 0 10px 15px -3px rgba(14, 165, 233, 0.3);
 }
+
+/* 响应式优化 */
+@layer utilities {
+  /* 滚动条隐藏 */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* 淡入动画 */
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-in;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* 移动端触摸优化 */
+  @media (max-width: 768px) {
+    /* 增大可点击区域 */
+    button, a, input, select {
+      min-height: 44px;
+    }
+
+    /* 防止双击缩放 */
+    * {
+      touch-action: manipulation;
+    }
+  }
+
+  /* 安全区域适配 (iOS 刘海屏) */
+  @supports (padding: env(safe-area-inset-bottom)) {
+    .safe-bottom {
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    .safe-top {
+      padding-top: env(safe-area-inset-top);
+    }
+  }
+}
