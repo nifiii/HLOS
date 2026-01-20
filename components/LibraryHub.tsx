@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Library, Search, Filter, Plus } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { EBook, IndexStatus } from '../types';
 import { BookUploader } from './BookUploader';
 import { BookMetadataEditor } from './BookMetadataEditor';
 import { BookCard } from './BookCard';
 import { getAllBooks, saveBook, deleteBook, getBooksByOwnerId } from '../services/bookStorage';
+import { Button, Card, LoadingSpinner, Input } from './ui';
 
 interface LibraryHubProps {
   currentUserId: string;
@@ -166,27 +168,27 @@ const LibraryHub: React.FC<LibraryHubProps> = ({ currentUserId }) => {
   const renderGridView = () => (
     <>
       {/* 顶部操作栏 */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
-        <div className="flex items-center justify-between gap-4">
+      <Card className="p-4 mb-6">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4">
           {/* 搜索框 */}
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
+            <Input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="搜索书名、作者、标签..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="pl-10"
             />
           </div>
 
           {/* 筛选器 */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Filter className="w-5 h-5 text-gray-600" />
             <select
               value={filterSubject}
               onChange={(e) => setFilterSubject(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm hover:border-sky-500 transition-colors"
             >
               <option value="all">全部学科</option>
               {subjects.map((subject) => (
@@ -199,7 +201,7 @@ const LibraryHub: React.FC<LibraryHubProps> = ({ currentUserId }) => {
             <select
               value={filterCategory}
               onChange={(e) => setFilterCategory(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm hover:border-sky-500 transition-colors"
             >
               <option value="all">全部类别</option>
               {categories.map((category) => (
@@ -212,7 +214,7 @@ const LibraryHub: React.FC<LibraryHubProps> = ({ currentUserId }) => {
             <select
               value={filterGrade}
               onChange={(e) => setFilterGrade(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm hover:border-sky-500 transition-colors"
             >
               <option value="all">全部年级</option>
               <option value="小学">小学</option>
@@ -222,40 +224,65 @@ const LibraryHub: React.FC<LibraryHubProps> = ({ currentUserId }) => {
           </div>
 
           {/* 上传按钮 */}
-          <button
+          <Button
+            variant="primary"
+            size="md"
+            icon={Plus}
             onClick={() => setViewMode('upload')}
-            className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
           >
-            <Plus className="w-5 h-5" />
             上传图书
-          </button>
+          </Button>
         </div>
-      </div>
+      </Card>
 
       {/* 图书网格 */}
       {loading ? (
-        <div className="text-center py-12 text-gray-500">加载中...</div>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex flex-col items-center justify-center min-h-[60vh]"
+        >
+          <LoadingSpinner size={48} text="加载图书中..." />
+        </motion.div>
       ) : filteredBooks.length === 0 ? (
-        <div className="text-center py-12">
-          <Library className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-500 mb-2">暂无图书</p>
-          <button
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex flex-col items-center justify-center min-h-[60vh]"
+        >
+          <div className="relative w-80 h-80 mb-8">
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-100 to-blue-100 rounded-3xl opacity-50" />
+            <div className="absolute inset-8 flex items-center justify-center">
+              <Library size={120} className="text-purple-300" />
+            </div>
+          </div>
+          <h2 className="text-2xl font-semibold mb-2">图书馆空空如也</h2>
+          <p className="text-gray-600 mb-8">上传第一本书开始学习之旅</p>
+          <Button
+            variant="primary"
+            size="lg"
+            icon={Plus}
             onClick={() => setViewMode('upload')}
-            className="text-blue-600 hover:text-blue-700 font-medium"
           >
-            立即上传第一本书
-          </button>
-        </div>
+            上传图书
+          </Button>
+        </motion.div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {filteredBooks.map((book) => (
-            <BookCard
+          {filteredBooks.map((book, index) => (
+            <motion.div
               key={book.id}
-              book={book}
-              onSelect={handleSelectBook}
-              onEdit={handleEditBook}
-              onDelete={handleDeleteBook}
-            />
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.05 }}
+            >
+              <BookCard
+                book={book}
+                onSelect={handleSelectBook}
+                onEdit={handleEditBook}
+                onDelete={handleDeleteBook}
+              />
+            </motion.div>
           ))}
         </div>
       )}
@@ -277,12 +304,14 @@ const LibraryHub: React.FC<LibraryHubProps> = ({ currentUserId }) => {
       {viewMode === 'grid' && renderGridView()}
       {viewMode === 'upload' && (
         <div className="max-w-2xl mx-auto">
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => setViewMode('grid')}
-            className="mb-4 text-blue-600 hover:text-blue-700 font-medium"
+            className="mb-4"
           >
             ← 返回图书馆
-          </button>
+          </Button>
           <BookUploader onUploadSuccess={handleUploadSuccess} ownerId={currentUserId} />
         </div>
       )}
