@@ -1,5 +1,6 @@
 
 import React, { useState, useRef } from 'react';
+import confetti from 'canvas-confetti';
 import { analyzeImage } from '../services/geminiService';
 import { ProcessingStatus, ScannedItem, UserProfile, DocType, ProblemStatus } from '../types';
 import { Button, LoadingSpinner, Card, Badge } from './ui';
@@ -55,6 +56,15 @@ const CaptureModule: React.FC<CaptureModuleProps> = ({ onScanComplete, currentUs
   const handleSaveAndArchive = () => {
     if (reviewItem) {
       onScanComplete(reviewItem);
+
+      // 触发成功动画
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#4A90E2', '#5FD4A0', '#FFB84D']
+      });
+
       setPreview(null);
       setReviewItem(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
