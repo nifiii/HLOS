@@ -1,5 +1,7 @@
 import React from 'react';
 import { ScannedItem, DocType, UserProfile } from '../types';
+import { Card, CardHeader, Badge, Button } from './ui';
+import { TrendingUp, Calendar, Clock, Award, Target, BookOpen } from 'lucide-react';
 
 interface DashboardProps {
   items: ScannedItem[];
@@ -15,16 +17,42 @@ const Dashboard: React.FC<DashboardProps> = ({ items, currentUser }) => {
   };
 
   return (
-    <div className="space-y-4 md:space-y-6">
-      <div className="flex items-center justify-between">
-         <div>
-           <h2 className="text-xl md:text-2xl font-bold text-gray-800">学情概览</h2>
-           <p className="text-xs text-gray-500 md:hidden">当前: {currentUser.name}</p>
-         </div>
-         <span className="text-xs md:text-sm bg-brand-100 text-brand-700 px-3 py-1 rounded-full whitespace-nowrap">
-            <i className="fa-solid fa-graduation-cap mr-1"></i> {currentUser.grade}
-         </span>
-      </div>
+    <div className="space-y-6">
+      {/* 欢迎区 */}
+      <section className="relative bg-gradient-to-r from-sky-400 to-mint-400 rounded-3xl p-8 text-white overflow-hidden">
+        {/* 背景装饰 */}
+        <div className="absolute top-0 right-0 opacity-20 pointer-events-none">
+          <svg width="200" height="200" viewBox="0 0 200 200" fill="none">
+            <circle cx="100" cy="50" r="40" fill="white" />
+            <circle cx="150" cy="80" r="25" fill="white" />
+            <circle cx="120" cy="100" r="15" fill="white" />
+          </svg>
+        </div>
+
+        <div className="relative z-10">
+          <h1 className="text-3xl font-bold mb-2">
+            {new Date().getHours() < 12 ? '早安' : new Date().getHours() < 18 ? '下午好' : '晚上好'}，{currentUser.name}！
+          </h1>
+          <p className="text-white/90">
+            {new Date().toLocaleDateString('zh-CN', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+              weekday: 'long'
+            })}
+          </p>
+        </div>
+
+        {/* 右上角：今日学习进度 */}
+        <div className="absolute top-8 right-8 hidden md:block">
+          <div className="w-24 h-24 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+            <div className="text-center">
+              <div className="text-2xl font-bold">75%</div>
+              <div className="text-xs text-white/80">今日学习</div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Stats Grid - 2 cols on mobile, 4 on desktop */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
