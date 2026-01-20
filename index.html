@@ -8,64 +8,14 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>智学 OS - 专家级解构版</title>
 
-    <!-- 净化后的 Importmap: 仅保留运行时必需的 React 18 和 GenAI -->
-    <script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@18.2.0?bundle",
-    "react-dom": "https://esm.sh/react-dom@18.2.0?bundle",
-    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client?bundle",
-    "react/jsx-runtime": "https://esm.sh/react@18.2.0/jsx-runtime?bundle",
-    "@google/genai": "https://esm.sh/@google/genai@0.2.1?bundle",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "vite": "https://esm.sh/vite@^7.3.1",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
-  }
-}
-</script>
-
-    <!-- 环境模拟脚本：解决包内部对 process 的引用 -->
-    <script>
-      window.process = { 
-        env: { 
-          NODE_ENV: 'production',
-          API_KEY: '' // 将由系统自动注入
-        } 
-      };
-    </script>
-
-    <!-- 静态资源 CDN 加速 -->
-    <script src="https://fastly.jsdelivr.net/npm/tailwindcss@3.4.1/lib/index.min.js"></script>
-    <link href="https://fastly.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.1/css/all.min.css" rel="stylesheet" />
-
-    <script>
-      if (typeof tailwind !== 'undefined') {
-        tailwind.config = {
-          theme: {
-            extend: {
-              colors: {
-                brand: { 50: '#f0f9ff', 100: '#e0f2fe', 500: '#0ea5e9', 600: '#0284c7', 900: '#0c4a6e' },
-                paper: '#f8fafc',
-              },
-              fontFamily: {
-                sans: ['"PingFang SC"', '"Microsoft YaHei"', 'system-ui', '-apple-system', 'sans-serif'],
-              }
-            }
-          }
-        }
-      }
-    </script>
-
+    <!-- 关键路径 CSS: 加载动画（必须内联以避免闪烁） -->
     <style>
-      html, body, #root { height: 100%; margin: 0; padding: 0; overflow: hidden; background-color: #f3f4f6; }
-      body { -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
       #loading-overlay { position: fixed; inset: 0; background: white; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; transition: opacity 0.4s ease; }
       .spinner { border: 3px solid #f3f3f3; border-top: 3px solid #0ea5e9; border-radius: 50%; width: 32px; height: 32px; animation: spin 1s linear infinite; }
       @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
       .retry-btn { margin-top: 2rem; padding: 12px 28px; background: #0ea5e9; color: white; border-radius: 16px; font-size: 14px; font-weight: bold; cursor: pointer; border: none; box-shadow: 0 10px 15px -3px rgba(14, 165, 233, 0.3); }
     </style>
-</head>
+  </head>
   <body>
     <div id="loading-overlay">
       <div id="loader-content" style="text-align: center; padding: 20px;">
