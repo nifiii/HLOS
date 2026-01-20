@@ -179,6 +179,7 @@ const StudyRoom: React.FC<StudyRoomProps> = ({ currentUser, books, wrongProblems
             selectedChapter={selectedChapter}
             wrongProblems={relevantWrongProblems}
             coursewareContent={coursewareContent}
+            studentName={currentUser.name}
           />
 
           {/* 完成按钮 */}
