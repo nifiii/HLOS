@@ -79,17 +79,24 @@ function extractTableOfContents(text: string): ChapterNode[] {
 
     if (match) {
       currentChapterId++;
-      const title = match[2] || match[1];
+      // 安全地提取标题，避免 null/undefined
+      const rawTitle = match[2] || match[1] || '';
+      const title = rawTitle.trim();
+
+      // 跳过空标题
+      if (!title) {
+        continue;
+      }
 
       // 判断章节层级
       let level = 1;
-      if (match[1].includes('节') || match[1].match(/^\d+\.\d+/)) {
+      if (match[1] && (match[1].includes('节') || match[1].match(/^\d+\.\d+/))) {
         level = 2;
       }
 
       chapters.push({
         id: `chapter-${currentChapterId}`,
-        title: title.trim(),
+        title,
         level,
         children: [],
       });

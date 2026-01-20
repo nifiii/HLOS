@@ -29,16 +29,20 @@ const METADATA_ANALYSIS_SYSTEM_INSTRUCTION = `你是一个专业的图书元数�
 4. **category**: 图书类型（教材/教辅/竞赛资料/考试真题/课外读物）
 5. **grade**: 年级段（小学/初中/高中/大学/其他）
 6. **tags**: 标签数组（如：["奥数", "几何", "代数"]，["中考", "真题"]等）
-7. **tableOfContents**: 章节目录树（ChapterNode 数组）
+7. **tableOfContents**: 章节目录扁平数组（⚠️ 重要：不要使用嵌套结构）
 
 **章节目录规则**：
+- 返回扁平数组，每个章节用 level 字段标识层级
 - level=1: 章（Chapter）
 - level=2: 节（Section）
 - level=3: 小节（Subsection）
+- 每个章节需要包含：id（唯一标识），title（标题），level（层级）
+- pageRange 可选，如果能从内容中推断出页码范围则填写
 - 如果用户提供了初步目录，请优化和完善它；若没有，请根据内容自行提取
 
 **注意**：
 - 必须严格按照 JSON Schema 输出
+- tableOfContents 必须是扁平数组，不要包含 children 字段
 - 若某字段无法确定，请给出最合理的推测
 - 标签要精准、实用，避免冗余`;
 
@@ -127,13 +131,10 @@ ${preliminaryTOC.length > 0 ? JSON.stringify(preliminaryTOC, null, 2) : '无'}
                     },
                     nullable: true,
                   },
-                  children: {
-                    type: Type.ARRAY,
-                    items: { type: Type.OBJECT },
-                  },
                 },
+                required: ['id', 'title', 'level'],
               },
-              description: '章节目录树',
+              description: '章节目录扁平数组（使用 level 区分层级，1=章，2=节，3=小节）',
             },
           },
           required: ['title', 'subject', 'category', 'grade', 'tags', 'tableOfContents'],
@@ -146,6 +147,14 @@ ${preliminaryTOC.length > 0 ? JSON.stringify(preliminaryTOC, null, 2) : '无'}
       throw new Error('AI 返回结果为空');
     }
     const metadata: BookMetadataAnalysisResult = JSON.parse(rawJson);
+
+    // 为每个章节添加空 children 数组（前端兼容性）
+    if (metadata.tableOfContents) {
+      metadata.tableOfContents = metadata.tableOfContents.map((chapter) => ({
+        ...chapter,
+        children: [],
+      }));
+    }
 
     console.log('元数据分析成功:', metadata.title);
     return metadata;
