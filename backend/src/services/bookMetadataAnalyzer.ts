@@ -1,13 +1,14 @@
 import { GoogleGenAI, Type } from '@google/genai';
 import { ChapterNode } from '../types';
 
-const apiKey = process.env.GEMINI_API_KEY;
-
-if (!apiKey) {
-  throw new Error('缺少 GEMINI_API_KEY 环境变量');
-}
-
-const ai = new GoogleGenAI({ apiKey });
+// 延迟初始化：仅在调用时检查 API Key，避免阻塞服务启动
+const getAIClient = () => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey === 'PLACEHOLDER_API_KEY') {
+    throw new Error('缺少有效的 GEMINI_API_KEY 环境变量');
+  }
+  return new GoogleGenAI({ apiKey });
+};
 
 export interface BookMetadataAnalysisResult {
   title: string;
@@ -69,6 +70,7 @@ ${preliminaryTOC.length > 0 ? JSON.stringify(preliminaryTOC, null, 2) : '无'}
 
 请返回完整的结构化元数据。`;
 
+    const ai = getAIClient();
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: {

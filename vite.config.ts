@@ -12,6 +12,16 @@ export default defineConfig(({ mode }) => {
       // 兼容代码中使用的 process.env.API_KEY
       'process.env.API_KEY': JSON.stringify(env.API_KEY)
     },
+    server: {
+      proxy: {
+        // 开发环境：将 /api 请求代理到后端服务器
+        '/api': {
+          target: 'http://localhost:3000',
+          changeOrigin: true,
+          secure: false
+        }
+      }
+    },
     build: {
       outDir: 'dist',
       sourcemap: false
