@@ -72,92 +72,111 @@ const CaptureModule: React.FC<CaptureModuleProps> = ({ onScanComplete, currentUs
   };
 
   if (reviewItem) {
+    const subjectColors: Record<string, string> = {
+      '数学': '#3B82F6',
+      '语文': '#FB7185',
+      '英语': '#A78BFA',
+      '科学': '#10B981',
+    };
+
     return (
-      <div className="flex flex-col h-[calc(100vh-140px)] md:h-[calc(100vh-100px)] animate-fade-in bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200">
-        <div className="relative h-[25%] md:h-[30%] bg-slate-900 border-b-4 border-brand-500 overflow-hidden">
-          <div className="w-full h-full overflow-auto review-scrollbar p-4 flex justify-center items-start">
-            <img 
-              src={reviewItem.imageUrl} 
-              className="transition-all duration-300 origin-top cursor-zoom-in rounded shadow-2xl"
-              style={{ width: `${100 * zoomLevel}%`, maxWidth: 'none' }}
-              onClick={() => setZoomLevel(prev => prev === 1 ? 2 : 1)}
-            />
-          </div>
-        </div>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="max-w-4xl mx-auto space-y-6"
+      >
+        {/* 原图预览 */}
+        <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => setZoomLevel(prev => prev === 1 ? 2 : 1)}>
+          <img src={reviewItem.imageUrl} className="w-full rounded-xl" alt="上传的图片" style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top center', transition: 'transform 0.3s' }} />
+          <div className="text-center text-sm text-gray-500 mt-4">点击查看{zoomLevel === 1 ? '大' : '原'}图</div>
+        </Card>
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50 review-scrollbar space-y-6">
-           <div className="flex justify-between items-center">
-              <h3 className="font-black text-slate-800 flex items-center text-sm md:text-base">
-                 <i className="fa-solid fa-microscope mr-2 text-brand-500"></i> 四层解构校核 (Expert Protocol)
-              </h3>
-              <button onClick={() => setReviewItem(null)} className="text-[10px] font-bold text-slate-400 hover:text-red-500">重拍</button>
-           </div>
+        {/* 识别结果 */}
+        <div className="space-y-4">
+          {reviewItem.meta.problems?.map((problem: any, index) => {
+            const color = subjectColors[problem.subject || '数学'] || '#4A90E2';
 
-           <div className="space-y-4 pb-10">
-              {reviewItem.meta.problems?.map((p: any, idx) => (
-                <div key={idx} className={`p-4 md:p-5 rounded-2xl border-2 transition-all ${
-                  p.status === ProblemStatus.WRONG ? 'bg-red-50 border-red-100' :
-                  p.status === ProblemStatus.CORRECTED ? 'bg-amber-50 border-amber-200' :
-                  'bg-emerald-50 border-emerald-100 opacity-90'
-                }`}>
-                   <div className="flex justify-between items-start mb-4">
-                      <div className="flex items-center space-x-2">
-                         <span className="w-5 h-5 rounded-full bg-white flex items-center justify-center text-[10px] font-black border border-slate-200">{idx+1}</span>
-                         <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
-                           p.status === ProblemStatus.WRONG ? 'bg-red-500 text-white' :
-                           p.status === ProblemStatus.CORRECTED ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'
-                         }`}>
-                            {p.status === 'wrong' ? '错题' : p.status === 'corrected' ? '已订正' : '正确'}
-                         </span>
-                      </div>
-                      <div className="flex bg-white/80 p-1 rounded-lg border border-slate-200 shadow-sm">
-                         {[ProblemStatus.CORRECT, ProblemStatus.WRONG, ProblemStatus.CORRECTED].map(s => (
-                           <button 
-                             key={s} 
-                             onClick={() => updateProblemStatus(idx, s)}
-                             className={`px-3 py-1 text-[9px] font-black rounded-md ${p.status === s ? 'bg-slate-800 text-white' : 'text-slate-400'}`}
-                           >
-                             {s === 'wrong' ? '错' : s === 'correct' ? '对' : '订'}
-                           </button>
-                         ))}
-                      </div>
-                   </div>
-                   
-                   <div className="space-y-3 text-[11px] leading-relaxed">
-                      <div className="text-slate-800 bg-white/60 p-2 rounded-lg border border-slate-100">
-                        <span className="text-[9px] font-black text-slate-400 uppercase block mb-1">原始内容 (层级 1)</span>
-                        {p.content}
-                      </div>
-                      {p.studentAnswer && (
-                        <div className="text-brand-700">
-                          <span className="text-[9px] font-black text-brand-300 uppercase block">学生回答 (层级 3)</span>
-                          {p.studentAnswer}
-                        </div>
-                      )}
-                      {p.teacherComment && (
-                        <div className="text-red-600 bg-red-100/30 p-2 rounded">
-                          <span className="text-[9px] font-black text-red-300 uppercase block">批改反馈 (层级 2)</span>
-                          {p.teacherComment}
-                        </div>
-                      )}
-                      {p.correction && (
-                        <div className="text-amber-800 bg-amber-100/50 p-2 rounded font-black border border-amber-200/50">
-                          <span className="text-[9px] font-black text-amber-400 uppercase block">订正记录 (层级 4)</span>
-                          {p.correction}
-                        </div>
-                      )}
-                   </div>
+            return (
+              <Card key={index} className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-lg font-semibold">第 {index + 1} 题</span>
+                  <span
+                    className="px-3 py-1 text-sm rounded-full font-medium"
+                    style={{
+                      backgroundColor: color + '20',
+                      color: color,
+                    }}
+                  >
+                    {problem.subject || '通用'}
+                  </span>
                 </div>
-              ))}
-           </div>
 
-           <div className="fixed bottom-4 left-4 right-4 md:relative md:bottom-0 md:left-0 md:right-0">
-             <button onClick={handleSaveAndArchive} className="w-full bg-brand-500 hover:bg-brand-600 text-white font-black py-4 rounded-2xl shadow-2xl transition-all">
-               <i className="fa-solid fa-file-export mr-2"></i> 同步至档案库 (L1-L4 闭环)
-             </button>
-           </div>
+                {/* 题目内容 */}
+                <div className="mb-4">
+                  <div className="text-gray-700 leading-relaxed whitespace-pre-wrap">
+                    {problem.content || problem.originalQuestion}
+                  </div>
+                </div>
+
+                {/* 学生答案 */}
+                {problem.studentAnswer && (
+                  <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded mb-4">
+                    <div className="text-sm text-red-700 font-medium mb-1">你的答案</div>
+                    <div className="text-gray-700">{problem.studentAnswer}</div>
+                  </div>
+                )}
+
+                {/* 正确答案/老师批注 */}
+                {problem.teacherComment && (
+                  <div className="bg-green-50 border-l-4 border-green-400 p-4 rounded mb-4">
+                    <div className="text-sm text-green-700 font-medium mb-1">老师批注</div>
+                    <div className="text-gray-700">{problem.teacherComment}</div>
+                  </div>
+                )}
+
+                {/* 订正记录 */}
+                {problem.correction && (
+                  <div className="bg-amber-50 border-l-4 border-amber-400 p-4 rounded mb-4">
+                    <div className="text-sm text-amber-700 font-medium mb-1">订正记录</div>
+                    <div className="text-gray-700">{problem.correction}</div>
+                  </div>
+                )}
+
+                {/* 知识点标签 */}
+                {problem.knowledgePoints && problem.knowledgePoints.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {problem.knowledgePoints.map((point: string, i: number) => (
+                      <Badge key={i} variant="default">{point}</Badge>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            );
+          })}
         </div>
-      </div>
+
+        {/* 底部按钮 */}
+        <div className="sticky bottom-4 flex gap-4">
+          <Button
+            variant="primary"
+            size="lg"
+            className="flex-1"
+            onClick={handleSaveAndArchive}
+          >
+            保存到知识库
+          </Button>
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={() => {
+              setPreview(null);
+              setReviewItem(null);
+            }}
+          >
+            重新识别
+          </Button>
+        </div>
+      </motion.div>
     );
   }
 
