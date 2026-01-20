@@ -34,7 +34,7 @@ export const useDashboardStats = (scannedItems: ScannedItem[]): DashboardStats =
     scannedItems.forEach(item => {
       if (item.meta.problems) {
         totalWrong += item.meta.problems.filter(
-          p => p.status === 'WRONG'
+          p => p.status === 'wrong'
         ).length;
       }
     });
@@ -45,8 +45,8 @@ export const useDashboardStats = (scannedItems: ScannedItem[]): DashboardStats =
     scannedItems.forEach(item => {
       if (item.meta.problems) {
         item.meta.problems.forEach(p => {
-          if (p.status === 'CORRECT') totalCorrect++;
-          if (p.status === 'WRONG') totalWrongCount++;
+          if (p.status === 'correct') totalCorrect++;
+          if (p.status === 'wrong') totalWrongCount++;
         });
       }
     });
