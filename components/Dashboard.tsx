@@ -48,6 +48,20 @@ const Dashboard: React.FC<DashboardProps> = ({ items, currentUser }) => {
     },
   ];
 
+  const recentActivities = items.slice(0, 5).map(item => ({
+    time: new Date(item.timestamp).toLocaleString('zh-CN', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }),
+    title: item.meta.type === DocType.WRONG_PROBLEM ? '错题录入' :
+           item.meta.type === DocType.NOTE ? '笔记记录' : '教材学习',
+    description: `${item.meta.subject} · ${item.meta.problems?.length || 0}个问题`,
+    color: item.meta.type === DocType.WRONG_PROBLEM ? '#FB7185' :
+           item.meta.type === DocType.NOTE ? '#A78BFA' : '#10B981',
+  }));
+
   return (
     <div className="space-y-6">
       {/* 欢迎区 */}
@@ -111,88 +125,41 @@ const Dashboard: React.FC<DashboardProps> = ({ items, currentUser }) => {
         })}
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 md:p-6 p-4">
-        <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
-          <i className="fa-solid fa-clock-rotate-left mr-2 text-brand-500"></i>
-          最近活动
-        </h3>
-        
-        {items.length === 0 ? (
-          <div className="text-center py-10 text-gray-400">
-            <i className="fa-solid fa-box-open text-4xl mb-3 opacity-50"></i>
-            <p className="text-sm">暂无数据，去拍个题吧！</p>
+      {/* 最近学习 */}
+      <Card>
+        <CardHeader title="最近学习" icon={<Clock size={20} />} />
+
+        {recentActivities.length === 0 ? (
+          <div className="text-center py-12 text-gray-500">
+            <BookOpen size={48} className="mx-auto mb-4 text-gray-300" />
+            <p>还没有学习记录</p>
           </div>
         ) : (
-          <>
-            {/* Desktop Table View */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    <th className="pb-3 pl-2">类型</th>
-                    <th className="pb-3">科目</th>
-                    <th className="pb-3">章节/标签</th>
-                    <th className="pb-3">时间</th>
-                    <th className="pb-3 text-right">状态</th>
-                  </tr>
-                </thead>
-                <tbody className="text-sm divide-y divide-gray-50">
-                  {items.slice(0, 5).map((item) => (
-                    <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="py-3 pl-2">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          item.meta.type === DocType.WRONG_PROBLEM ? 'bg-red-100 text-red-700' :
-                          item.meta.type === DocType.TEXTBOOK ? 'bg-green-100 text-green-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
-                          {item.meta.type === DocType.WRONG_PROBLEM ? '错题' :
-                           item.meta.type === DocType.TEXTBOOK ? '教材' :
-                           item.meta.type === DocType.NOTE ? '笔记' :
-                           item.meta.type === DocType.EXAM_PAPER ? '试卷' : '未知'}
-                        </span>
-                      </td>
-                      <td className="py-3 font-medium text-gray-800">{item.meta.subject || '通用'}</td>
-                      <td className="py-3 text-gray-500">{item.meta.chapter_hint || '-'}</td>
-                      <td className="py-3 text-gray-500">{new Date(item.timestamp).toLocaleDateString()}</td>
-                      <td className="py-3 text-right">
-                        <span className="text-green-600 font-medium text-xs">
-                          <i className="fa-solid fa-check mr-1"></i> 已归档
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile Card View */}
-            <div className="md:hidden space-y-3">
-              {items.slice(0, 5).map((item) => (
-                <div key={item.id} className="flex items-center p-3 bg-gray-50 rounded-lg border border-gray-100">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 mr-3 ${
-                    item.meta.type === DocType.WRONG_PROBLEM ? 'bg-red-100 text-red-600' :
-                    item.meta.type === DocType.TEXTBOOK ? 'bg-green-100 text-green-600' :
-                    'bg-blue-100 text-blue-600'
-                  }`}>
-                    <i className={`fa-solid ${
-                      item.meta.type === DocType.WRONG_PROBLEM ? 'fa-xmark' :
-                      item.meta.type === DocType.TEXTBOOK ? 'fa-book' :
-                      'fa-file-lines'
-                    }`}></i>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-start">
-                      <h4 className="font-bold text-gray-800 text-sm truncate">{item.meta.subject}</h4>
-                      <span className="text-[10px] text-gray-400">{new Date(item.timestamp).toLocaleDateString()}</span>
-                    </div>
-                    <p className="text-xs text-gray-500 truncate">{item.meta.chapter_hint || '未分类'}</p>
-                  </div>
+          <div className="space-y-4">
+            {recentActivities.map((activity, index) => (
+              <div key={index} className="flex gap-4">
+                {/* 时间轴圆点 */}
+                <div className="flex flex-col items-center">
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: activity.color }}
+                  />
+                  {index < recentActivities.length - 1 && (
+                    <div className="w-0.5 flex-1 bg-gray-200 my-1" />
+                  )}
                 </div>
-              ))}
-            </div>
-          </>
+
+                {/* 内容 */}
+                <div className="flex-1 pb-4">
+                  <div className="text-sm text-gray-500 mb-1">{activity.time}</div>
+                  <div className="font-medium mb-1">{activity.title}</div>
+                  <div className="text-sm text-gray-600">{activity.description}</div>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
-      </div>
+      </Card>
     </div>
   );
 };
