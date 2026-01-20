@@ -2,6 +2,9 @@
 import React, { useState, useRef } from 'react';
 import { analyzeImage } from '../services/geminiService';
 import { ProcessingStatus, ScannedItem, UserProfile, DocType, ProblemStatus } from '../types';
+import { Button, LoadingSpinner, Card, Badge } from './ui';
+import { Camera, Upload, CheckCircle } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 interface CaptureModuleProps {
   onScanComplete: (item: ScannedItem) => void;
@@ -170,26 +173,98 @@ const CaptureModule: React.FC<CaptureModuleProps> = ({ onScanComplete, currentUs
          </div>
       </div>
 
-      <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 p-8 text-center">
-        {!preview ? (
-          <div onClick={() => fileInputRef.current?.click()} className="border-4 border-dashed border-slate-100 rounded-[2rem] p-12 cursor-pointer hover:bg-slate-50 transition-all group">
-            <input type="file" accept="image/*" capture="environment" className="hidden" ref={fileInputRef} onChange={handleFileChange} />
-            <div className="w-20 h-20 bg-brand-50 text-brand-500 rounded-3xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform"><i className="fa-solid fa-camera text-3xl"></i></div>
-            <h3 className="text-xl font-bold text-slate-800">拍照或上传</h3>
-            <p className="text-sm text-slate-400 mt-2">支持漫画描述、红笔批改与手写订正识别</p>
-          </div>
-        ) : (
-          <div className="space-y-6 text-left">
-            <div className="relative rounded-2xl overflow-hidden border-2 border-slate-100 shadow-inner">
-               <img src={preview} className="max-h-[50vh] mx-auto" />
-               <button onClick={() => setPreview(null)} className="absolute top-4 right-4 bg-black/50 text-white w-8 h-8 rounded-full flex items-center justify-center transition-colors"><i className="fa-solid fa-xmark"></i></button>
+      {!preview && !isProcessing ? (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col items-center justify-center min-h-[60vh]"
+        >
+          {/* 相机插画 */}
+          <div className="relative w-64 h-64 mb-8">
+            <div className="absolute inset-0 bg-gradient-to-br from-sky-100 to-mint-100 rounded-full opacity-50 animate-pulse-slow" />
+            <div className="absolute inset-8 bg-white rounded-3xl shadow-card flex items-center justify-center">
+              <Camera size={80} className="text-sky-500" />
             </div>
-            <button onClick={handleProcess} disabled={isProcessing} className="w-full py-5 bg-brand-500 hover:bg-brand-600 text-white rounded-2xl font-black shadow-xl disabled:bg-slate-300 transition-all flex items-center justify-center">
-              {isProcessing ? <><i className="fa-solid fa-dna fa-spin mr-2"></i> 正在提取语义图层...</> : <><i className="fa-solid fa-bolt mr-2"></i> 启动全维度 AI 识别</>}
+            {/* 星星装饰 */}
+            <div className="absolute top-4 right-4 w-6 h-6 bg-sunset-400 rounded-full opacity-60" />
+            <div className="absolute bottom-8 left-4 w-4 h-4 bg-mint-400 rounded-full opacity-60" />
+          </div>
+
+          <h2 className="text-2xl font-semibold mb-2 text-gray-800">拍下错题</h2>
+          <p className="text-gray-600 mb-8">AI 帮你智能分析薄弱点</p>
+
+          <div className="flex flex-col sm:flex-row gap-4">
+            <Button
+              variant="primary"
+              size="lg"
+              icon={Camera}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              拍照
+            </Button>
+            <Button
+              variant="success"
+              size="lg"
+              icon={Upload}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              从相册选择
+            </Button>
+          </div>
+
+          <input
+            id="file-input"
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+          />
+        </motion.div>
+      ) : preview && !isProcessing ? (
+        <Card className="space-y-6">
+          <div className="relative rounded-2xl overflow-hidden border-2 border-slate-100 shadow-inner">
+            <img src={preview} className="max-h-[50vh] mx-auto" />
+            <button
+              onClick={() => setPreview(null)}
+              className="absolute top-4 right-4 bg-black/50 text-white w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/70 transition-colors"
+            >
+              <i className="fa-solid fa-xmark"></i>
             </button>
           </div>
-        )}
-      </div>
+          <Button
+            variant="primary"
+            size="lg"
+            className="w-full"
+            onClick={handleProcess}
+            disabled={isProcessing}
+          >
+            <i className="fa-solid fa-bolt mr-2"></i> 启动 AI 识别
+          </Button>
+        </Card>
+      ) : isProcessing ? (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex flex-col items-center justify-center min-h-[60vh]"
+        >
+          <LoadingSpinner size={48} text="AI 正在识别中..." />
+          <p className="text-sm text-gray-500 mt-4">识别速度受网络影响</p>
+
+          {/* 进度提示 */}
+          <div className="mt-8 w-64">
+            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+              <motion.div
+                className="h-full bg-gradient-to-r from-sky-400 to-mint-400"
+                initial={{ width: 0 }}
+                animate={{ width: '100%' }}
+                transition={{ duration: 3, ease: 'easeInOut' }}
+              />
+            </div>
+          </div>
+        </motion.div>
+      ) : null}
     </div>
   );
 };
