@@ -8,13 +8,45 @@ interface DashboardProps {
   currentUser: UserProfile;
 }
 
+interface StatCard {
+  label: string;
+  value: number;
+  icon: any;
+  color: string;
+  trend?: number;
+}
+
 const Dashboard: React.FC<DashboardProps> = ({ items, currentUser }) => {
-  const stats = {
-    total: items.length,
-    wrongProblems: items.filter(i => i.meta.type === DocType.WRONG_PROBLEM).length,
-    notes: items.filter(i => i.meta.type === DocType.NOTE).length,
-    textbooks: items.filter(i => i.meta.type === DocType.TEXTBOOK).length,
-  };
+  const stats: StatCard[] = [
+    {
+      label: '总收录数',
+      value: items.length,
+      icon: BookOpen,
+      color: '#4A90E2',
+      trend: 12
+    },
+    {
+      label: '待复习数',
+      value: items.filter(i => i.meta.type === DocType.WRONG_PROBLEM).length,
+      icon: Clock,
+      color: '#FFB84D',
+      trend: -5
+    },
+    {
+      label: '本周学习',
+      value: 15,
+      icon: Target,
+      color: '#FB7185',
+      trend: 8
+    },
+    {
+      label: '掌握率',
+      value: Math.round((items.filter(i => i.meta.type === DocType.NOTE).length / items.length) * 100) || 0,
+      icon: Award,
+      color: '#10B981',
+      trend: 3
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -54,24 +86,29 @@ const Dashboard: React.FC<DashboardProps> = ({ items, currentUser }) => {
         </div>
       </section>
 
-      {/* Stats Grid - 2 cols on mobile, 4 on desktop */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-        {[
-          { label: '总收录', val: stats.total, color: 'bg-blue-500', icon: 'fa-layer-group' },
-          { label: '错题本', val: stats.wrongProblems, color: 'bg-red-500', icon: 'fa-circle-xmark' },
-          { label: '笔记数', val: stats.notes, color: 'bg-yellow-500', icon: 'fa-note-sticky' },
-          { label: '教材资料', val: stats.textbooks, color: 'bg-green-500', icon: 'fa-book-open' },
-        ].map((stat, idx) => (
-          <div key={idx} className="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row items-start md:items-center justify-between relative overflow-hidden">
-            <div className="relative z-10">
-              <p className="text-xs text-gray-500 font-medium mb-1">{stat.label}</p>
-              <p className="text-2xl md:text-3xl font-bold text-gray-800">{stat.val}</p>
-            </div>
-            <div className={`absolute right-[-10px] bottom-[-10px] md:relative md:right-0 md:bottom-0 w-16 h-16 md:w-12 md:h-12 rounded-full md:rounded-lg ${stat.color} text-white flex items-center justify-center opacity-20 md:opacity-90`}>
-              <i className={`fa-solid ${stat.icon} text-3xl md:text-xl`}></i>
-            </div>
-          </div>
-        ))}
+      {/* 统计卡片 */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {stats.map((stat) => {
+          const Icon = stat.icon;
+          return (
+            <Card key={stat.label} hover className="p-6">
+              <div
+                className="w-12 h-12 rounded-full mb-3 flex items-center justify-center"
+                style={{ backgroundColor: stat.color + '20' }}
+              >
+                <Icon style={{ color: stat.color }} size={24} />
+              </div>
+              <div className="text-3xl font-bold mb-1">{stat.value}{stat.label === '掌握率' ? '%' : ''}</div>
+              <div className="text-sm text-gray-600 mb-2">{stat.label}</div>
+              {stat.trend !== undefined && (
+                <div className={`flex items-center gap-1 text-xs ${stat.trend > 0 ? 'text-mint-500' : 'text-red-500'}`}>
+                  <TrendingUp size={14} className={stat.trend < 0 ? 'rotate-180' : ''} />
+                  <span>{Math.abs(stat.trend)}%</span>
+                </div>
+              )}
+            </Card>
+          );
+        })}
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 md:p-6 p-4">
