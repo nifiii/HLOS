@@ -12,6 +12,8 @@ services:
     environment:
       # ⚠️ 关键配置：数据持久化存储路径（容器内路径）
       - STORAGE_DIR=/app/server/storage
+      # 显式指定 Prisma 数据库路径（绝对路径）
+      - DATABASE_URL=file:/app/server/storage/anythingllm.db
       - LLM_PROVIDER=gemini
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - EMBEDDING_ENGINE=gemini
