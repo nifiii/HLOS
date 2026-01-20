@@ -563,6 +563,295 @@ confetti({
 
 ## 5. 数据模型
 
+### 5.0 数据存储架构
+
+智学 OS 采用**三层存储架构**，针对不同数据类型使用最优存储方案，兼顾性能、可维护性和资源占用（适配 2C4G 服务器）。
+
+---
+
+#### 5.0.1 三层存储概览
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  层级1: AnythingLLM (向量数据库 - 热数据/可搜索)          │
+│  ├─ LanceDB 向量存储 (嵌入容器内)                        │
+│  ├─ Gemini text-embedding-004 向量化                    │
+│  ├─ 存储: 文本内容 + 元数据(含文件路径链接)              │
+│  └─ 用途: RAG检索、语义搜索                              │
+└─────────────────────────────────────────────────────────┘
+                      ↓ 元数据包含文件路径
+┌─────────────────────────────────────────────────────────┐
+│  层级2: Obsidian文件夹 (结构化内容/永久存储)              │
+│  ├─ Wrong_Problems/    (错题本 Markdown)                │
+│  ├─ No_Problems/       (试卷&作业 Markdown)             │
+│  └─ Courses/           (课件&测验 Markdown)             │
+│  路径: /opt/hl-os/data/obsidian/                         │
+└─────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────┐
+│  层级3: 原始文件目录 (原始资源/存证备份)                   │
+│  ├─ images/  (原始图片 - 按月归档)                       │
+│  └─ books/   (电子教材 PDF/EPUB/TXT)                    │
+│  路径: /opt/hl-os/data/originals/                        │
+└─────────────────────────────────────────────────────────┘
+```
+
+**数据流向**：
+1. 用户上传 → 后端保存原始���件到 `originals/` + Obsidian Markdown到 `obsidian/`
+2. 后端推送元数据到 AnythingLLM（包含文件路径链接）
+3. 前端通过 API 查询 AnythingLLM → 获取文件路径 → 读取 Markdown/PDF 内容
+
+---
+
+#### 5.0.2 目录结构设计
+
+```bash
+/opt/hl-os/data/
+├── obsidian/                    # Obsidian文件夹（Markdown存储）
+│   ├── Wrong_Problems/          # 错题本
+│   │   ├── 大宝/
+│   │   │   ├── 数学/
+│   │   │   │   └── 2026-01-20_三角函数诱导公式_abc123.md
+│   │   │   ├── 物理/
+│   │   │   └── 英语/
+│   │   ├── 二宝/
+│   │   └── shared/              # 共享错题（全家可见）
+│   │
+│   ├── No_Problems/             # 试卷作业（无错题）
+│   │   ├── 大宝/
+│   │   │   ├── 数学/
+│   │   │   │   └── 2026-01-18_期末考试卷_def456.md
+│   │   │   └── 语文/
+│   │   └── 二宝/
+│   │
+│   └── Courses/                 # AI生成的课件和测验
+│       ├── 大宝/
+│       │   ├── 数学/
+│       │   │   ├── 2026-01-19_第二章三角函数课件.md
+│       │   │   └── 2026-01-19_第二章配套测验.md
+│       │   └── 物理/
+│       └── 二宝/
+│
+├── originals/                   # 原始文件存储
+│   ├── images/                  # 原始图片（按月归档）
+│   │   └── 2026-01/             # YYYY-MM/
+│   │       ├── 20_143022_abc123.jpg      # 20号14:30:22上传
+│   │       ├── 20_150830_def456.jpg
+│   │       └── 21_091510_ghi789.png
+│   │
+│   └── books/                   # 电子教材（按月归档）
+│       └── 2026-01/
+│           ├── 高中数学必修1.pdf
+│           ├── 高中英语必修3.epub
+│           └── 初中物理八年级.txt
+│
+└── metadata.json                # 轻量级元数据索引（可选）
+    # 用于快速查询、统计、备份
+    # 格式：JSON数组，包含所有文档的元数据摘要
+```
+
+**文件命名规范**：
+- Markdown文件：`日期_主题_唯一ID.md`
+- 原始图片：`DD_HHMMSS_唯一ID.jpg`
+- 教材文件：`原文件名`（保留用户上传的文件名）
+
+**目录分组规范**：
+- 按用户分组（`大宝`/`二宝`/`shared`）
+- 按学科分组（数学/语文/英语/物理/化学...）
+- 按时间归档（`YYYY-MM/`）
+
+---
+
+#### 5.0.3 AnythingLLM 向量数据库配置
+
+**技术栈**：
+- 向量数据库：**LanceDB**（嵌入式，无需额外进程）
+- Embedding引擎：**Gemini text-embedding-004**
+- 容器镜像：`mintplexlabs/anythingllm:latest`
+- 数据持久化：`./anythingllm-storage:/app/server/storage`
+
+**Docker配置** (`docker-compose.yml`)：
+```yaml
+anythingllm:
+  image: mintplexlabs/anythingllm:latest
+  environment:
+    - VECTOR_DB=lancedb                  # 向量数据库
+    - EMBEDDING_ENGINE=gemini            # Embedding引擎
+    - GEMINI_EMBEDDING_MODEL=text-embedding-004
+    - CHUNK_SIZE=800                     # 文本分块大小
+    - CHUNK_OVERLAP=150                  # 分块重叠
+    - MAX_CONCURRENT_CHUNKS=2            # 并发数（2C4G优化）
+  volumes:
+    - ./anythingllm-storage:/app/server/storage
+  deploy:
+    resources:
+      limits:
+        memory: 2G
+```
+
+**存储内容**：
+| 数据类型 | 文本内容 | 元数据字段 |
+|---------|---------|-----------|
+| 电子教材 | PDF提取的全文 | `filePath`, `ownerId`, `subject`, `grade`, `tags` |
+| 错题 | Obsidian Markdown全文 | `mdPath`, `imagePath`, `ownerId`, `subject`, `chapter` |
+| 试卷作业 | Obsidian Markdown全文 | `mdPath`, `imagePath`, `ownerId`, `subject`, `docType` |
+| 课件测验 | Obsidian Markdown全文 | `mdPath`, `ownerId`, `subject`, `chapter` |
+
+**元数据示例**：
+```json
+{
+  "filePath": "/opt/hl-os/data/originals/books/2026-01/高中数学必修1.pdf",
+  "mdPath": "/opt/hl-os/data/obsidian/Wrong_Problems/大宝/数学/2026-01-20_三角函数错题.md",
+  "imagePath": "/opt/hl-os/data/originals/images/2026-01/20_143022_abc123.jpg",
+  "ownerId": "child_1",
+  "subject": "数学",
+  "chapter": "三角函数",
+  "docType": "wrong_problem",
+  "timestamp": 1737360000,
+  "hasWrongProblems": true
+}
+```
+
+**API接口**：
+- `POST /api/anythingllm/index-book` - 索引教材
+- `POST /api/anythingllm/index-scanned-item` - 索引扫描项
+- `POST /api/anythingllm/search` - RAG检索
+
+---
+
+#### 5.0.4 Obsidian 文件格式规范
+
+**Frontmatter (YAML前置)**：
+```yaml
+---
+type: wrong_problem
+subject: 数学
+chapter: 三角函数
+knowledge_status: 未掌握
+owner: child_1
+created: 2026-01-20T14:30:22.000Z
+problems_count: 3
+tags: [三角函数, 诱导公式, 错题]
+---
+
+# 数学 - 三角函数诱导公式错题
+
+## 原题内容
+
+### 题目 1: (1)
+
+**原题内容：**
+求 $\sin(210°)$ 的值
+
+**学生作答：**
+1/3
+
+**教师批改：**
+公式记错了，应该是第三象限为负值
+
+**订正记录：**
+$\sin(210°) = -1/2$
+
+**状态：** ❌ 错误
+
+---
+
+## AI分析
+
+**错因类型**：公式记忆错误
+**涉及知识点**：三角函数诱导公式、象限符号
+**推荐练习**：第2章练习册 15-20题
+```
+
+**文件路径作为唯一标识**：
+- 同一个错题/试卷的Markdown文件和原始图片通过元数据关联
+- AnythingLLM存储的 `mdPath` 和 `imagePath` 指向这两个文件
+
+---
+
+#### 5.0.5 数据存储策略对比
+
+| 内容类型 | AnythingLLM | Obsidian | 原始文件 | 说明 |
+|---------|-------------|----------|---------|------|
+| **电子教材** | ✅ 全量存储（Hot/可搜索） | ❌ 仅存MOC索引 | ✅ 原始PDF/EPUB | PDF文本向量化用于RAG |
+| **原始图片** | ✅ 全量存储（Cold/不搜索） | ❌ | ✅ 原始JPG/PNG | 存证备份 |
+| **OCR试卷作业** | 索引链接 | ✅ 永久存储 | ❌ | `No_Problems/` |
+| **OCR错题** | 索引链接 | ✅ 永久存储 | ✅ 原始图片 | `Wrong_Problems/` |
+| **AI课件测验** | 索引链接 | ✅ 永久存储 | ❌ | `Courses/` |
+
+**存储原则**：
+- **AnythingLLM**：用于RAG检索的热数据（文本向量化 + 文件路径元数据）
+- **Obsidian**：用户可阅读的结构化内容（Markdown格式，便于编辑和导出）
+- **原始文件**：不可替代的原始资源（PDF/EPUB/图片）
+
+**资源占用估算（2C4G服务器）**：
+- AnythingLLM（LanceDB）：~500MB（1000份文档）
+- Obsidian文件夹：~10MB（1000份Markdown，平均10KB/份）
+- 原始文件：~2GB（100个PDF教材 + 1000张图片）
+- **总计**：~2.5GB（完全可接受）
+
+---
+
+#### 5.0.6 数据备份与恢复
+
+**备份策略**：
+```bash
+#!/bin/bash
+# 每日备份脚本 /opt/hl-os/scripts/backup.sh
+
+DATE=$(date +%Y%m%d)
+BACKUP_DIR=/opt/hl-os/backups/$DATE
+
+mkdir -p $BACKUP_DIR
+
+# 1. 备份 Obsidian 文件夹
+tar -czf $BACKUP_DIR/obsidian.tar.gz /opt/hl-os/data/obsidian/
+
+# 2. 备份原始文件
+tar -czf $BACKUP_DIR/originals.tar.gz /opt/hl-os/data/originals/
+
+# 3. 备份 AnythingLLM 向量数据库
+tar -czf $BACKUP_DIR/anythingllm.tar.gz /opt/hl-os/anythingllm-storage/
+
+# 4. 备份元数据索引
+cp /opt/hl-os/data/metadata.json $BACKUP_DIR/
+
+echo "备份完成: $BACKUP_DIR"
+```
+
+**恢复策略**：
+```bash
+#!/bin/bash
+# 恢复脚本 /opt/hl-os/scripts/restore.sh
+
+BACKUP_DIR=$1  # 例如: /opt/hl-os/backups/20260120
+
+# 1. 恢复 Obsidian 文件夹
+tar -xzf $BACKUP_DIR/obsidian.tar.gz -C /
+
+# 2. 恢复原始文件
+tar -xzf $BACKUP_DIR/originals.tar.gz -C /
+
+# 3. 恢复 AnythingLLM
+tar -xzf $BACKUP_DIR/anythingllm.tar.gz -C /opt/hl-os/
+
+# 4. 重启容器
+docker-compose restart anythingllm backend
+
+echo "恢复完成"
+```
+
+**自动化备份（Cron）**：
+```bash
+# 每日凌晨3点执行备份
+0 3 * * * /opt/hl-os/scripts/backup.sh
+
+# 保留最近30天的备份
+0 4 * * * find /opt/hl-os/backups -type d -mtime +30 -exec rm -rf {} \;
+```
+
+---
+
 ### 5.1 核心类型定义 (`types.ts`)
 
 #### UserProfile (用户档案)
