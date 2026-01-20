@@ -6,16 +6,6 @@ import { Calendar, BookOpen } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const KnowledgeHub: React.FC<{ items: ScannedItem[], currentUser: UserProfile }> = ({ items, currentUser }) => {
-  const [filterStatus, setFilterStatus] = useState<KnowledgeStatus | 'all'>('all');
-
-  const filteredItems = filterStatus === 'all' ? items : items.filter(i => i.meta.knowledge_status === filterStatus);
-
-  const statusIcons = {
-    [KnowledgeStatus.MASTERED]: 'fa-circle-check text-emerald-500',
-    [KnowledgeStatus.UNMASTERED]: 'fa-circle-xmark text-red-500',
-    [KnowledgeStatus.STRENGTHEN]: 'fa-circle-exclamation text-amber-500',
-  };
-
   const [currentFilter, setCurrentFilter] = useState('全部');
 
   const filterOptions = ['全部', '错题', '笔记', '教材'];
@@ -50,45 +40,83 @@ const KnowledgeHub: React.FC<{ items: ScannedItem[], currentUser: UserProfile }>
         ))}
       </div>
 
-      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto large-scrollbar pr-2">
-         {filteredItems.map(item => (
-           <div key={item.id} className="bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl transition-all p-5 flex flex-col group">
-              <div className="flex items-center justify-between mb-4">
-                 <div className="flex items-center space-x-2">
-                    <i className={`fa-solid ${statusIcons[item.meta.knowledge_status || KnowledgeStatus.STRENGTHEN]} text-xs`}></i>
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">
-                       {item.meta.subject} / {item.meta.type}
-                    </span>
-                 </div>
-                 <span className="text-[8px] font-bold text-slate-300">{new Date(item.timestamp).toLocaleDateString()}</span>
-              </div>
-              
-              <div className="flex-1 bg-slate-50 rounded-2xl p-4 mb-4 font-mono text-[10px] text-slate-500 leading-relaxed overflow-hidden border border-slate-100">
-                 <div className="text-brand-500 font-bold mb-2">--- (Frontmatter) ---</div>
-                 <div>status: {item.meta.knowledge_status}</div>
-                 <div>category: {item.meta.type}</div>
-                 <div>path: {currentUser.name}/2026-01/{item.meta.subject}/...</div>
-                 <div className="mt-2 text-slate-800 opacity-60 line-clamp-3">{item.rawMarkdown}</div>
-              </div>
+      {/* 知识卡片网格 */}
+      {displayItems.length === 0 ? (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex flex-col items-center justify-center min-h-[60vh]"
+        >
+          <div className="relative w-80 h-80 mb-8">
+            <div className="absolute inset-0 bg-gradient-to-br from-gray-100 to-gray-200 rounded-3xl opacity-50" />
+            <div className="absolute inset-8 flex items-center justify-center">
+              <BookOpen size={120} className="text-gray-300" />
+            </div>
+          </div>
+          <h2 className="text-2xl font-semibold mb-2">知识库空空如也</h2>
+          <p className="text-gray-600 mb-8">去拍题录入内容吧</p>
+        </motion.div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {displayItems.map((item, index) => {
+            const subjectColors: Record<string, string> = {
+              '数学': '#3B82F6',
+              '语文': '#FB7185',
+              '英语': '#A78BFA',
+              '科学': '#10B981',
+            };
+            const color = subjectColors[item.meta.subject || '数学'] || '#4A90E2';
 
-              <div className="flex items-center justify-between pt-2">
-                 <div className="flex -space-x-2">
-                    <div className="w-7 h-7 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-[10px] shadow-sm"><i className="fa-solid fa-file-pdf text-red-500"></i></div>
-                    <div className="w-7 h-7 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-[10px] shadow-sm"><i className="fa-solid fa-file-lines text-slate-400"></i></div>
-                 </div>
-                 <button className="text-brand-500 hover:text-brand-600 transition-colors">
-                    <i className="fa-solid fa-up-right-from-square text-sm"></i>
-                 </button>
-              </div>
-           </div>
-         ))}
-         {filteredItems.length === 0 && (
-           <div className="col-span-full h-full flex flex-col items-center justify-center opacity-20 py-20">
-              <i className="fa-solid fa-inbox text-6xl mb-4"></i>
-              <p className="font-black uppercase tracking-widest">该分类下暂无数据</p>
-           </div>
-         )}
-      </div>
+            return (
+              <motion.div
+                key={item.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+              >
+                <Card hover onClick={() => {}}>
+                  {/* 顶部彩色条 */}
+                  <div className="h-2 -mx-6 -mt-6 mb-4 rounded-t-2xl" style={{ backgroundColor: color }} />
+
+                  {/* 头部：学科标签 + 状态 */}
+                  <div className="flex items-center justify-between mb-4">
+                    <span
+                      className="px-3 py-1 text-sm rounded-full font-medium"
+                      style={{
+                        backgroundColor: color + '20',
+                        color: color,
+                      }}
+                    >
+                      {item.meta.subject}
+                    </span>
+                    <Badge
+                      variant={item.meta.knowledge_status === KnowledgeStatus.MASTERED ? 'success' : 'warning'}
+                    >
+                      {item.meta.knowledge_status === KnowledgeStatus.MASTERED ? '已掌握' : '待复习'}
+                    </Badge>
+                  </div>
+
+                  {/* 内容预览 */}
+                  <div className="text-gray-700 mb-4 line-clamp-3 leading-relaxed">
+                    {item.meta.problems?.[0]?.content || item.rawMarkdown || '暂无内容'}
+                  </div>
+
+                  {/* 底部：日期 + 章节提示 */}
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-500 flex items-center gap-1">
+                      <Calendar size={14} />
+                      {new Date(item.timestamp).toLocaleDateString('zh-CN')}
+                    </span>
+                    {item.meta.chapter_hint && (
+                      <Badge size="sm" variant="default">{item.meta.chapter_hint}</Badge>
+                    )}
+                  </div>
+                </Card>
+              </motion.div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };
