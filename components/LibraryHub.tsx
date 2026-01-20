@@ -5,7 +5,7 @@ import { EBook, IndexStatus } from '../types';
 import { BookUploader } from './BookUploader';
 import { BookMetadataEditor } from './BookMetadataEditor';
 import { BookCard } from './BookCard';
-import { getAllBooks, saveBook, deleteBook, getBooksByOwnerId } from '../services/bookStorage';
+import { fetchBooks } from '../services/apiService';
 import { Button, Card, LoadingSpinner, Input, Skeleton } from './ui';
 
 interface LibraryHubProps {
@@ -35,12 +35,9 @@ const LibraryHub: React.FC<LibraryHubProps> = ({ currentUserId }) => {
   const loadBooks = async () => {
     try {
       setLoading(true);
-      const allBooks = await getAllBooks();
-      // 过滤：显示当前用户的书 + 共享的书
-      const filtered = allBooks.filter(
-        (book) => book.ownerId === currentUserId || book.ownerId === 'shared'
-      );
-      setBooks(filtered);
+      // 从服务器加载图书（API 会自动过滤当前用户和共享的）
+      const fetchedBooks = await fetchBooks({ ownerId: currentUserId });
+      setBooks(fetchedBooks);
     } catch (error) {
       console.error('加载图书失败:', error);
     } finally {
@@ -74,30 +71,15 @@ const LibraryHub: React.FC<LibraryHubProps> = ({ currentUserId }) => {
   // 保存图书元数据
   const handleSaveMetadata = async (metadata: Partial<EBook>) => {
     try {
-      const newBook: EBook = {
-        ...(metadata as EBook),
-        id: metadata.id || `book-${Date.now()}`,
-        uploadedAt: metadata.uploadedAt || Date.now(),
-        ownerId: currentUserId,
-        indexStatus: IndexStatus.PENDING,
-        fileFormat: metadata.fileFormat || pendingUpload?.fileFormat || 'pdf',
-        fileSize: metadata.fileSize || pendingUpload?.fileSize || 0,
-        tags: metadata.tags || [],
-        tableOfContents: metadata.tableOfContents || [],
-      };
-
-      await saveBook(newBook);
+      // 图书已在上传时保存到服务器，这里只需刷新列表
       await loadBooks();
-
-      // TODO: 后续调用 AnythingLLM 索引 API
-      // await indexBookToAnythingLLM(newBook, pendingUpload.content);
 
       setPendingUpload(null);
       setEditingBook(null);
       setViewMode('grid');
     } catch (error) {
-      console.error('保存图书失败:', error);
-      alert('保存失败，请重试');
+      console.error('刷新图书列表失败:', error);
+      alert('刷新失败，请重试');
     }
   };
 
@@ -106,7 +88,8 @@ const LibraryHub: React.FC<LibraryHubProps> = ({ currentUserId }) => {
     if (!confirm('确定要删除这本书吗？')) return;
 
     try {
-      await deleteBook(bookId);
+      // TODO: 实现服务端删除 API
+      // await deleteBook(bookId);
       await loadBooks();
     } catch (error) {
       console.error('删除图书失败:', error);

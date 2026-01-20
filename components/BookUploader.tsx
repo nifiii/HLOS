@@ -56,8 +56,9 @@ export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, own
     try {
       const formData = new FormData();
       formData.append('file', file);
+      formData.append('ownerId', ownerId);
 
-      const response = await fetch('/api/upload-book', {
+      const response = await fetch('/api/save-book', {
         method: 'POST',
         body: formData,
       });
