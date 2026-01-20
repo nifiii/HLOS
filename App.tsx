@@ -81,7 +81,7 @@ const App: React.FC = () => {
     try {
       switch (activeTab) {
         case 'dashboard':
-          return <Dashboard items={filteredItems} currentUser={currentUser} />;
+          return <Dashboard items={filteredItems} currentUser={currentUser} onTabChange={setActiveTab} />;
         case 'library_hub':
           return <LibraryHub currentUserId={currentUser.id} />;
         case 'capture':
@@ -111,11 +111,11 @@ const App: React.FC = () => {
         case 'exams':
           return <ExamCenter scannedItems={filteredItems} currentUser={currentUser} />;
         default:
-          return <Dashboard items={filteredItems} currentUser={currentUser} />;
+          return <Dashboard items={filteredItems} currentUser={currentUser} onTabChange={setActiveTab} />;
       }
     } catch (e: any) {
       setErrorMsg(e.message || "应用运行出错");
-      return <Dashboard items={filteredItems} currentUser={currentUser} />;
+      return <Dashboard items={filteredItems} currentUser={currentUser} onTabChange={setActiveTab} />;
     }
   };
 

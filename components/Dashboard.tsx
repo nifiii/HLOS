@@ -1,11 +1,12 @@
 import React from 'react';
 import { ScannedItem, DocType, UserProfile } from '../types';
 import { Card, CardHeader, Badge, Button } from './ui';
-import { TrendingUp, Calendar, Clock, Award, Target, BookOpen } from 'lucide-react';
+import { TrendingUp, Calendar, Clock, Award, Target, BookOpen, Camera, Library, GraduationCap, FileText } from 'lucide-react';
 
 interface DashboardProps {
   items: ScannedItem[];
   currentUser: UserProfile;
+  onTabChange: (tab: string) => void;
 }
 
 interface StatCard {
@@ -16,7 +17,7 @@ interface StatCard {
   trend?: number;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ items, currentUser }) => {
+const Dashboard: React.FC<DashboardProps> = ({ items, currentUser, onTabChange }) => {
   const stats: StatCard[] = [
     {
       label: '总收录数',
@@ -61,6 +62,37 @@ const Dashboard: React.FC<DashboardProps> = ({ items, currentUser }) => {
     color: item.meta.type === DocType.WRONG_PROBLEM ? '#FB7185' :
            item.meta.type === DocType.NOTE ? '#A78BFA' : '#10B981',
   }));
+
+  const shortcuts = [
+    {
+      id: 'capture',
+      label: '拍题录入',
+      description: '快速拍摄错题',
+      icon: Camera,
+      color: '#5FD4A0'
+    },
+    {
+      id: 'library_hub',
+      label: '图书管理',
+      description: '上传新教材',
+      icon: Library,
+      color: '#A78BFA'
+    },
+    {
+      id: 'study_room',
+      label: '开始学习',
+      description: '生成课件',
+      icon: GraduationCap,
+      color: '#4A90E2'
+    },
+    {
+      id: 'vault',
+      label: '智能组卷',
+      description: '针对性练习',
+      icon: FileText,
+      color: '#FFB84D'
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -159,6 +191,33 @@ const Dashboard: React.FC<DashboardProps> = ({ items, currentUser }) => {
             ))}
           </div>
         )}
+      </Card>
+
+      {/* 快捷入口 */}
+      <Card>
+        <CardHeader title="快捷入口" icon={<Target size={20} />} />
+
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {shortcuts.map((item) => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.id}
+                onClick={() => onTabChange(item.id)}
+                className="p-6 rounded-xl border-2 border-gray-100 hover:border-sky-300 hover:bg-sky-50 transition-all duration-300 group text-left"
+              >
+                <div
+                  className="w-16 h-16 mx-auto mb-3 rounded-2xl flex items-center justify-center group-hover:rotate-6 transition-transform"
+                  style={{ backgroundColor: item.color + '20' }}
+                >
+                  <Icon style={{ color: item.color }} size={32} />
+                </div>
+                <div className="font-medium mb-1 text-center">{item.label}</div>
+                <div className="text-xs text-gray-500 text-center">{item.description}</div>
+              </button>
+            );
+          })}
+        </div>
       </Card>
     </div>
   );
