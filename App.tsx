@@ -38,6 +38,22 @@ const App: React.FC = () => {
     loadBooks();
   }, []);
 
+  // 🔧 修复：切换标签页时重新加载图书数据（确保数据同步）
+  useEffect(() => {
+    const reloadBooksOnTabSwitch = async () => {
+      // 当切换到自习室或图书馆时，重新加载图书列表
+      if (activeTab === 'study_room' || activeTab === 'library_hub') {
+        try {
+          const allBooks = await getAllBooks();
+          setBooks(allBooks);
+        } catch (error) {
+          console.error('重新加载图书失败:', error);
+        }
+      }
+    };
+    reloadBooksOnTabSwitch();
+  }, [activeTab]);
+
   // 自动清除错误消息
   useEffect(() => {
     if (errorMsg) {
