@@ -24,7 +24,39 @@ export interface BookParseResult {
 }
 
 /**
- * 解析 PDF 文件
+ * 轻量级 PDF 元数据提取（只读取元数据，不解析文本内容）
+ * @param buffer PDF 文件的 Buffer
+ * @returns 解析结果包含页数、元数据
+ */
+export async function extractPDFMetadata(buffer: Buffer): Promise<{
+  pageCount: number;
+  estimatedMetadata: {
+    title?: string;
+    author?: string;
+    subject?: string;
+  };
+}> {
+  try {
+    const data: PDFParseResult = await pdfParse(buffer);
+
+    // 只返回元数据和页数，不返回文本内容
+    return {
+      pageCount: data.numpages,
+      estimatedMetadata: {
+        title: data.metadata.title,
+        author: data.metadata.author,
+        subject: data.metadata.subject,
+      },
+    };
+  } catch (error) {
+    console.error('PDF 元数据提取失败:', error);
+    const message = error instanceof Error ? error.message : '未知错误';
+    throw new Error(`PDF 元数据提取失败: ${message}`);
+  }
+}
+
+/**
+ * 解析 PDF 文件（完整解析，包含文本内容）
  * @param buffer PDF 文件的 Buffer
  * @returns 解析结果包含文本内容、页数、元数据
  */
