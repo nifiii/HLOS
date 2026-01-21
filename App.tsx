@@ -9,6 +9,7 @@ import ExamCenter from './components/ExamCenter';
 import LibraryHub from './components/LibraryHub';
 import StudyRoom from './components/StudyRoom';
 import LiveTutor from './components/LiveTutor';
+import LoginModal from './components/LoginModal';
 import { ScannedItem, UserProfile, EBook, KnowledgeStatus, ProcessingStatus } from './types';
 import { fetchBooks, fetchScannedItems } from './services/apiService';
 
@@ -24,6 +25,69 @@ const App: React.FC = () => {
   const [books, setBooks] = useState<EBook[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showTutor, setShowTutor] = useState(false);
+
+  // 认证状态
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const [userRole, setUserRole] = useState<'admin' | 'student' | null>(null);
+
+  // 检查Session
+  useEffect(() => {
+    const checkSession = async () => {
+      const sessionId = localStorage.getItem('sessionId');
+
+      if (!sessionId) {
+        setIsCheckingSession(false);
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/auth/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          setIsAuthenticated(true);
+          setUserRole(result.data.role);
+          // 如果是学生，设置对应的用户
+          if (result.data.role === 'student') {
+            setCurrentUser(FAMILY_PROFILES.find(p => p.id === result.data.userId) || FAMILY_PROFILES[0]);
+          }
+        } else {
+          // Session无效，清除本地存储
+          localStorage.removeItem('sessionId');
+          localStorage.removeItem('role');
+          localStorage.removeItem('userId');
+        }
+      } catch (error) {
+        console.error('[Session Check] 错误:', error);
+        // 静默失败，显示登录框
+      } finally {
+        setIsCheckingSession(false);
+      }
+    };
+
+    checkSession();
+  }, []);
+
+  // 处理登录成功
+  const handleLoginSuccess = (sessionId: string, role: 'admin' | 'student', userId: string) => {
+    setIsAuthenticated(true);
+    setUserRole(role);
+
+    if (role === 'student') {
+      // 学生登录，设置对应的孩子用户
+      const childUser = FAMILY_PROFILES.find(p => p.id === userId);
+      if (childUser) {
+        setCurrentUser(childUser);
+      }
+    }
+    // 管理员可以使用默认用户（大宝）
+  };
 
   // 加载图书数据（从服务器）
   useEffect(() => {
@@ -181,6 +245,23 @@ const App: React.FC = () => {
       return <Dashboard items={filteredItems} currentUser={currentUser} onTabChange={setActiveTab} />;
     }
   };
+
+  // 如果正在检查Session，显示加载中
+  if (isCheckingSession) {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-br from-sky-400 to-mint-400 flex items-center justify-center">
+        <div className="text-center text-white">
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-white border-t-transparent mb-4 mx-auto" />
+          <p className="text-lg font-medium">加载中...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 如果未认证，显示登录框
+  if (!isAuthenticated) {
+    return <LoginModal onLoginSuccess={handleLoginSuccess} />;
+  }
 
   return (
     <Layout
