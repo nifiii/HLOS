@@ -54,6 +54,7 @@ export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, own
     setError('');
     setSuccess(false);
 
+    console.log('📤 开始上传图书，端点: /api/upload-chunk');
     // 使用分片上传
     const result = await uploadFile(file, ownerId, '/api/upload-chunk');
 
