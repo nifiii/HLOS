@@ -1,33 +1,33 @@
-# 部署指南
+# 智学 OS 部署指南
 
-本文档描述如何在 **CentOS 8.2 云服务器**（2核4G, 50GB）上部署智学 OS。
+**适用环境**: CentOS 8.2 / Ubuntu 20.04
+**服务器规格**: 2核4G (推荐)
+**最后更新**: 2026-01-21
 
 ---
 
-## 📋 服务器规格
+## 目录
 
-### 目标配置（已验证）
+- [1. 快速部署](#1-快速部署)
+- [2. 混合部署方案](#2-混合部署方案)
+- [3. 容器化编译](#3-容器化编译)
+- [4. 数据持久化功能](#4-数据持久化功能)
+- [5. 故障排查](#5-故障排查)
 
+---
+
+## 1. 快速部署
+
+### 1.1 服务器规格
+
+**目标配置**（已验证）:
 - **CPU**: 2 核
 - **内存**: 4GB
 - **硬盘**: 50GB
-- **操作系统**: CentOS 8.2
+- **操作系统**: CentOS 8.2 或 Ubuntu 20.04
 - **网络**: 公网 IP + 80/443 端口开放
 
-### 资源分配规划
-
-| 服务 | CPU | 内存 | 磁盘 | 端口 |
-|------|-----|------|------|------|
-| Nginx | 0.5核 | 512MB | 1GB | 80/443 |
-| Backend | 0.5核 | 1GB | 2GB | 3000 |
-| AnythingLLM | 1核 | 2GB | 10GB | 3001 |
-| 系统预留 | - | 512MB | 37GB | - |
-
----
-
-## 🚀 快速部署（一键脚本）
-
-### 前置准备
+### 1.2 前置准备
 
 1. **获取 API Key**:
    - 访问 [Google AI Studio](https://aistudio.google.com/)
@@ -39,633 +39,359 @@
    ssh root@your-server-ip
    ```
 
-### 执行部署
+### 1.3 一键部署 (Ubuntu/CentOS)
 
 ```bash
 # 1. 安装 Git（如果未安装）
-yum install -y git
+yum install -y git          # CentOS
+# apt-get install -y git    # Ubuntu
 
 # 2. 克隆项目
 git clone <your-repo-url>
-cd home-learning-os
+cd HL-os
 
-# 3. 执行自动化部署脚本
-chmod +x scripts/centos-deploy.sh
-./scripts/centos-deploy.sh
+# 3. 配置环境变量
+cp .env.example .env
+vim .env  # 填写 GEMINI_API_KEY 等
+
+# 4. 执行部署脚本
+chmod +x deploy.sh
+sudo ./deploy.sh
 ```
 
 部署脚本会自动完成：
 1. 检测并安装 Docker 和 Docker Compose
 2. 配置系统优化参数
-3. 引导配置 API Key
-4. 构建前端和后端
-5. 启动 Docker 容器
-6. 执行健康检查
+3. 构建前端和后端
+4. 启动 Docker 容器
+5. 执行健康检查
 
-部署完成后，访问 `http://your-server-ip` 即可使用。
+**部署完成后**，访问 `http://your-server-ip` 即可使用。
 
 ---
 
-## 📦 手动部署（详细步骤）
+## 2. 混合部署方案
 
-如果需要手动控制部署过程，请按照以下步骤操作。
+### 2.1 架构对比
 
-### 1. 系统初始化
+| 组件 | 全 Docker 方案 | 混合部署方案 | 理由 |
+|------|--------------|------------|------|
+| **前端** | Nginx 容器 | 系统 Nginx | 静态文件无需容器隔离 |
+| **后端** | Node 容器 | systemd 服务 | 减少容器开销，原生性能 |
+| **AnythingLLM** | 容器 | 容器 | 第三方服务，隔离更安全 |
 
-```bash
-# 更新系统
-yum update -y
+### 2.2 资源消耗对比（2核4G 服务器）
 
-# 安装基础工具
-yum install -y wget curl git vim net-tools
+```
+全 Docker 方案:
+├── Nginx 容器:      50MB
+├── Node 容器:       250MB + 容器层开销 100MB
+├── AnythingLLM:     800MB
+└── Docker Daemon:   150MB
+    总计:            ~1.35GB
 
-# 配置时区（可选）
-timedatectl set-timezone Asia/Shanghai
+混合部署方案:
+├── 系统 Nginx:      10MB
+├── Node 进程:       200MB
+├─��� AnythingLLM:     800MB
+└── Docker Daemon:   50MB (仅一个容器)
+    总计:            ~1.06GB
 
-# 同步系统时间
-yum install -y chrony
-systemctl start chronyd
-systemctl enable chronyd
+节省: ~300MB 内存 + ~15% CPU
 ```
 
-### 2. 安装 Docker
+### 2.3 前置准备（混合部署）
 
 ```bash
-# 卸载旧版本 Docker（如果存在）
-yum remove -y docker docker-client docker-client-latest docker-common docker-latest
+# 1. 安装 Node.js 20
+curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -  # CentOS
+# curl -fsSL https://deb.nodesource.com/setup_20.x | bash -  # Ubuntu
+yum install -y nodejs
+# apt-get install -y nodejs
 
-# 安装 Docker 依赖
-yum install -y yum-utils device-mapper-persistent-data lvm2
+# 2. 安装 Nginx
+yum install -y nginx
+# apt-get install -y nginx
+systemctl enable nginx
+systemctl start nginx
 
-# 添加 Docker 仓库（使用阿里云镜像加速）
-yum-config-manager --add-repo https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
-
-# 安装 Docker CE
-yum install -y docker-ce docker-ce-cli containerd.io
-
-# 启动 Docker
-systemctl start docker
+# 3. 安装 Docker & Docker Compose
+curl -fsSL https://get.docker.com | bash
 systemctl enable docker
+systemctl start docker
 
-# 验证 Docker 安装
-docker --version
-# 输出: Docker version 24.0.x, build xxx
-```
-
-### 3. 安装 Docker Compose
-
-```bash
-# 下载 Docker Compose（使用国内镜像）
-curl -L "https://get.daocloud.io/docker/compose/releases/download/v2.23.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-
-# 赋予执行权限
+# 安装 Docker Compose
+curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" \
+  -o /usr/local/bin/docker-compose
 chmod +x /usr/local/bin/docker-compose
-
-# 创建软链接
-ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
-
-# 验证安装
-docker-compose --version
-# 输出: Docker Compose version v2.23.0
 ```
 
-### 4. 配置 Docker 镜像加速
+### 2.4 执行混合部署
 
 ```bash
-# 创建 Docker 配置目录
-mkdir -p /etc/docker
+# 1. 上传代码到服务器
+scp -r HL-os/ root@your-server:/root/
 
-# 配置阿里云镜像加速
-cat > /etc/docker/daemon.json <<EOF
-{
-  "registry-mirrors": [
-    "https://mirror.ccs.tencentyun.com",
-    "https://docker.mirrors.ustc.edu.cn"
-  ],
-  "log-driver": "json-file",
-  "log-opts": {
-    "max-size": "100m",
-    "max-file": "3"
-  }
-}
-EOF
+# 2. 进入项目目录
+cd /root/HL-os
 
-# 重启 Docker
-systemctl daemon-reload
-systemctl restart docker
-```
-
-### 5. 克隆项目代码
-
-```bash
-# 切换到工作目录
-cd /opt
-
-# 克隆项目
-git clone <your-repo-url> home-learning-os
-cd home-learning-os
-
-# 检查分支
-git branch -a
-git checkout main  # 或其他目标分支
-```
-
-### 6. 配置环境变量
-
-```bash
-# 复制环境变量模板
+# 3. 配置环境变量
 cp .env.example .env
+vim .env  # 填写 GEMINI_API_KEY 等
 
-# 编辑配置文件
-vim .env
+# 4. 执行混合部署
+chmod +x deploy-hybrid.sh
+sudo ./deploy-hybrid.sh
 ```
 
-`.env` 文件配置示例：
+### 2.5 运维命令（混合部署）
 
 ```bash
-# Google Gemini API Key (必需)
-GEMINI_API_KEY=AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+# 查看后端日志（实时）
+journalctl -u hl-backend -f
 
-# AnythingLLM API Key (自动生成)
-# 生成命令: openssl rand -hex 32
-ANYTHINGLLM_API_KEY=a1b2c3d4e5f6789012345678901234567890123456789012345678901234
+# 重启后端
+systemctl restart hl-backend
 
-# 环境模式
-NODE_ENV=production
+# 重载 Nginx 配置
+nginx -t && systemctl reload nginx
+
+# 管理 AnythingLLM
+docker-compose -f docker-compose.anythingllm.yml logs -f
+docker-compose -f docker-compose.anythingllm.yml restart
 ```
 
-**生成 ANYTHINGLLM_API_KEY**:
+### 2.6 Systemd服务配置
+
+**hl-backend.service**:
+```ini
+[Unit]
+Description=HL-OS Backend Service
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/hl-os/backend
+Environment="NODE_ENV=production"
+Environment="PORT=3000"
+EnvironmentFile=/opt/hl-os/backend/.env
+ExecStart=/usr/bin/node /opt/hl-os/backend/dist/index.js
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**管理命令**:
 ```bash
-openssl rand -hex 32
+# 启动服务
+sudo systemctl start hl-backend
+
+# 停止服务
+sudo systemctl stop hl-backend
+
+# 查看状态
+sudo systemctl status hl-backend
+
+# 查看日志
+sudo journalctl -u hl-backend -f
 ```
-
-### 7. 执行一键部署
-
-```bash
-# 赋予执行权限
-chmod +x deploy.sh
-
-# 执行部署脚本
-./deploy.sh
-```
-
-部署脚本会自动：
-1. 检查 `.env` 配置
-2. 重组目录结构（首次部署）
-3. 安装前端依赖并构建
-4. 安装后端依赖
-5. 启动 Docker Compose（Nginx + Backend + AnythingLLM）
-6. 执行健康检查
-
-### 8. 验证部署
-
-**健康检查**:
-```bash
-# 检查容器状态
-docker-compose ps
-
-# 应该显示 3 个容器都在运行:
-# hl-nginx        nginx -g daemon off;        Up      80/tcp, 443/tcp
-# hl-backend      node dist/index.js          Up      3000/tcp
-# hl-anythingllm  npm start                   Up      3001/tcp
-```
-
-**API 健康检查**:
-```bash
-# 测试后端健康检查接口
-curl http://localhost/api/health
-
-# 预期输出:
-# {"status":"ok","timestamp":1737123456789,"version":"1.0.0"}
-```
-
-**浏览器访问**:
-- 前端: http://your-server-ip
-- 后端健康检查: http://your-server-ip/api/health
-- AnythingLLM 管理界面: http://your-server-ip:3001
 
 ---
 
-## 🔧 系统优化（2核4G 专项优化）
+## 3. 容器化编译
 
-### 1. 启用 Swap 交换空间
+### 3.1 问题背景
 
-```bash
-# 检查是否已有 Swap
-swapon --show
+在服务器直接执行 `npm run build` 时遇到以下错误：
 
-# 创建 2GB Swap 文件
-dd if=/dev/zero of=/swapfile bs=1M count=2048
-chmod 600 /swapfile
-mkswap /swapfile
-swapon /swapfile
-
-# 永久生效（写入 /etc/fstab）
-echo '/swapfile none swap sw 0 0' >> /etc/fstab
-
-# 调整 Swap 使用策略（减少对 Swap 的依赖）
-sysctl vm.swappiness=10
-echo 'vm.swappiness=10' >> /etc/sysctl.conf
-
-# 验证
-free -h
+```
+SyntaxError: Unexpected token ?
+    at Module._compile (internal/modules/cjs/loader.js:723:23)
 ```
 
-### 2. 优化文件描述符限制
+**根本原因**:
+- 服务器 Node.js 版本过低（v10.x）
+- TypeScript 5.2.2 使用了 ES2020 的空值合并运算符 `??`
+- Node.js v10 不支持 ES2020 语法
+
+### 3.2 解决方案
+
+使用 **Docker 多阶段构建**，在容器内使用 Node.js 20 进行编译。
+
+### 3.3 一键编译
 
 ```bash
-# 查看当前限制
-ulimit -n
+# 赋予执行权限
+chmod +x build.sh
 
-# 临时提升限制
-ulimit -n 65535
-
-# 永久生效
-cat >> /etc/security/limits.conf <<EOF
-* soft nofile 65535
-* hard nofile 65535
-EOF
+# 执行容器化编译
+./build.sh
 ```
 
-### 3. 调整内核参数
+脚本会自动：
+1. 构建前端编译容器
+2. 复制前端产物到 `build-output/frontend/dist/`
+3. 构建后端编译容器
+4. 复制后端产物到 `build-output/backend/dist/`
+5. 销毁所有编译容器
+6. 生成构建报告 `build-output/build-report.txt`
+
+### 3.4 编译产物位置
+
+```
+build-output/
+├── frontend/
+│   └── dist/                    # 前端静态文件
+│       ├── index.html
+│       ├── assets/
+│       └── ...
+├── backend/
+│   └── dist/                    # 后端编译后的 JS
+│       ├── index.js
+│       ├── routes/
+│       └── services/
+└── build-report.txt             # 构建报告
+```
+
+### 3.5 性能数据
+
+| 阶段 | 耗时 | 磁盘占用 |
+|------|------|----------|
+| 前端依赖安装 | ~2 分钟 | 300MB |
+| 前端 TypeScript 编译 | ~30 秒 | - |
+| 前端 Vite 构建 | ~1 分钟 | - |
+| 前端产物大小 | - | ~5MB |
+| 后端依赖安装 | ~1 分钟 | 150MB |
+| 后端 TypeScript 编译 | ~15 秒 | - |
+| 后端产物大小 | - | ~500KB |
+| **总耗时** | **~5 分钟** | **~460MB** |
+
+---
+
+## 4. 数据持久化功能
+
+### 4.1 功能概述
+
+已完成的功能：
+- ✅ 扫描项（错题/笔记）保存到服务器文件系统
+- ✅ 教材文件保存到服务器文件系统
+- ✅ Obsidian 格式 Markdown 自动生成
+- ✅ AnythingLLM 向量数据库自动索引
+- ✅ 前端从服务器加载数据（移除 IndexedDB）
+- ✅ **分片上传**：支持大文件上传（5MB分片），带进度显示和重试机制
+- ✅ **多图片上传**：支持多页试卷，串行OCR处理
+- ✅ **临时文件清理**：自动清理24小时前的过期分片文件
+
+### 4.2 三层存储架构
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  层级1: AnythingLLM (向量数据库 - 热数据/可搜索)          │
+│  ├─ LanceDB 向量存储 (嵌入容器内)                        │
+│  ├─ Gemini text-embedding-004 向量化                    │
+│  └─ 用途: RAG检索、语义搜索                              │
+└─────────────────────────────────────────────────────────┘
+                      ↓ 元数据包含文件路径
+┌─────────────────────────────────────────────────────────┐
+│  层级2: Obsidian文件夹 (结构化内容/永久存储)              │
+│  ├─ Wrong_Problems/    (错题本 Markdown)                │
+│  ├─ No_Problems/       (试卷&作业 Markdown)             │
+│  └─ Courses/           (课件&测验 Markdown)             │
+└─────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────┐
+│  层级3: 原始文件目录 (原始资源/存证备份)                   │
+│  ├─ images/  (原始图片 - 按月归档)                       │
+│  └─ books/   (电子教材 PDF/EPUB/TXT)                    │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 4.3 创建数据目录
 
 ```bash
-cat >> /etc/sysctl.conf <<EOF
-# 网络优化
-net.core.somaxconn = 1024
-net.ipv4.tcp_max_syn_backlog = 2048
-net.ipv4.tcp_tw_reuse = 1
-net.ipv4.tcp_fin_timeout = 30
+# SSH 登录服务器
+ssh user@your-server
 
-# 内存优化
-vm.overcommit_memory = 1
-vm.max_map_count = 262144
-EOF
+# 创建数据目录
+sudo mkdir -p /opt/hl-os/data
+sudo chown -R www-data:www-data /opt/hl-os
 
-# 应用配置
-sysctl -p
+# 子目录会自动创建：
+# /opt/hl-os/data/obsidian/
+# /opt/hl-os/data/originals/
+# /opt/hl-os/data/metadata.json
 ```
 
-### 4. Docker 资源限制调优
+### 4.4 更新 Docker Compose 配置
 
-项目已在 `docker-compose.yml` 中针对 2核4G 服务器进行优化：
+确保 `docker-compose.yml` 包含数据卷挂载：
 
 ```yaml
-# AnythingLLM 内存限制
-deploy:
-  resources:
-    limits:
-      memory: 2G
-    reservations:
-      memory: 1G
-
-# 分块策略优化
-environment:
-  - CHUNK_SIZE=800
-  - CHUNK_OVERLAP=150
-  - MAX_CONCURRENT_CHUNKS=2
+backend:
+  volumes:
+    - ./data:/opt/hl-os/data  # 数据持久化
+    - ./uploads:/app/uploads  # 分片上传目录
+  environment:
+    - DATA_DIR=/opt/hl-os/data
+    - UPLOAD_DIR=/app/uploads
 ```
 
-**如需进一步调整**，编辑 `docker-compose.yml`:
-```bash
-vim docker-compose.yml
-
-# 修改 AnythingLLM 内存限制
-# limits.memory: 2G → 1.5G （如果内存不足）
-
-# 重启服务
-docker-compose down
-docker-compose up -d
-```
-
-### 5. 定期清理 Docker 资源
+### 4.5 验证服务
 
 ```bash
-# 手动清理未使用的镜像和容器
-docker system prune -af
+# 健康检查
+curl http://localhost:3000/api/health
 
-# 添加定时任务（每周日凌晨2点执行）
-(crontab -l 2>/dev/null; echo "0 2 * * 0 docker system prune -af") | crontab -
+# 预期响应：
+# {"status":"ok","timestamp":1737360000000,"version":"1.0.0"}
 ```
 
-### 6. 日志轮转配置
+### 4.6 数据备份
+
+**自动备份脚本** (`/opt/hl-os/scripts/backup.sh`):
 
 ```bash
-# Docker 已在 daemon.json 中配置日志限制:
-# "log-opts": {"max-size": "100m", "max-file": "3"}
-
-# 为 Nginx 配置日志轮转
-cat > /etc/logrotate.d/nginx-docker <<EOF
-/var/lib/docker/containers/*/*.log {
-    rotate 3
-    daily
-    compress
-    missingok
-    notifempty
-    sharedscripts
-}
-EOF
-```
-
----
-
-## 🔒 防火墙配置
-
-### CentOS 8 使用 firewalld
-
-```bash
-# 检查 firewalld 状态
-systemctl status firewalld
-
-# 如果未启动，启动 firewalld
-systemctl start firewalld
-systemctl enable firewalld
-
-# 允许 HTTP/HTTPS
-firewall-cmd --permanent --add-service=http
-firewall-cmd --permanent --add-service=https
-
-# 如果需要暴露 AnythingLLM 管理界面（不推荐生产环境）
-# firewall-cmd --permanent --add-port=3001/tcp
-
-# 重载配置
-firewall-cmd --reload
-
-# 查看已开放端口
-firewall-cmd --list-all
-```
-
-### SELinux 配置（可选）
-
-```bash
-# 查看 SELinux 状态
-getenforce
-
-# 如果遇到权限问题，可临时关闭（不推荐生产环境）
-setenforce 0
-
-# 永久关闭 SELinux（需重启）
-sed -i 's/SELINUX=enforcing/SELINUX=disabled/' /etc/selinux/config
-
-# 推荐做法：配置 SELinux 策略而不是关闭
-setsebool -P httpd_can_network_connect 1
-```
-
----
-
-## 🌐 配置 HTTPS（Let's Encrypt 免费证书）
-
-### 前提条件
-
-- 已有域名并正确解析到服务器 IP
-- 80 端口未被占用
-
-### 步骤 1: 安装 Certbot
-
-```bash
-# CentOS 8 安装 Certbot
-yum install -y certbot
-
-# 安装 Python 插件
-yum install -y python3-certbot-nginx
-```
-
-### 步骤 2: 生成证书
-
-```bash
-# 停止 Nginx 容器（避免端口冲突）
-docker-compose stop nginx
-
-# 使用 Certbot 申请证书
-certbot certonly --standalone -d your-domain.com -d www.your-domain.com
-
-# 按提示输入邮箱（用于续期通知）
-# 证书生成路径:
-# /etc/letsencrypt/live/your-domain.com/fullchain.pem
-# /etc/letsencrypt/live/your-domain.com/privkey.pem
-```
-
-### 步骤 3: 复制证书到项目目录
-
-```bash
-# 创建 SSL 目录
-mkdir -p /opt/home-learning-os/ssl
-
-# 复制证书
-cp /etc/letsencrypt/live/your-domain.com/fullchain.pem /opt/home-learning-os/ssl/cert.pem
-cp /etc/letsencrypt/live/your-domain.com/privkey.pem /opt/home-learning-os/ssl/key.pem
-
-# 修改权限
-chown -R 1000:1000 /opt/home-learning-os/ssl
-```
-
-### 步骤 4: 修改 Nginx 配置
-
-编辑 `nginx.conf`，取消 HTTPS 配置的注释：
-
-```bash
-vim nginx.conf
-```
-
-取消以下部分的注释（行号 80-91）：
-
-```nginx
-server {
-    listen 443 ssl http2;
-    server_name your-domain.com;
-
-    ssl_certificate /etc/nginx/ssl/cert.pem;
-    ssl_certificate_key /etc/nginx/ssl/key.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-
-    # 其他配置与 HTTP server 块相同
-}
-```
-
-### 步骤 5: 重启服务
-
-```bash
-docker-compose up -d
-```
-
-### 步骤 6: 配置自动续期
-
-Let's Encrypt 证书有效期 90 天，需配置自动续期：
-
-```bash
-# 创建续期脚本
-cat > /usr/local/bin/renew-cert.sh <<'EOF'
 #!/bin/bash
-docker-compose -f /opt/home-learning-os/docker-compose.yml stop nginx
-certbot renew --quiet
-cp /etc/letsencrypt/live/your-domain.com/fullchain.pem /opt/home-learning-os/ssl/cert.pem
-cp /etc/letsencrypt/live/your-domain.com/privkey.pem /opt/home-learning-os/ssl/key.pem
-docker-compose -f /opt/home-learning-os/docker-compose.yml start nginx
-EOF
+DATE=$(date +%Y%m%d)
+BACKUP_DIR="/opt/hl-os/backups/$DATE"
 
-chmod +x /usr/local/bin/renew-cert.sh
+mkdir -p "$BACKUP_DIR"
 
-# 添加到 crontab（每月1号凌晨3点执行）
-(crontab -l 2>/dev/null; echo "0 3 1 * * /usr/local/bin/renew-cert.sh >> /var/log/certbot-renew.log 2>&1") | crontab -
+# 备份 Obsidian 文件夹
+tar -czf "$BACKUP_DIR/obsidian.tar.gz" /opt/hl-os/data/obsidian/
+
+# 备份原始文件
+tar -czf "$BACKUP_DIR/originals.tar.gz" /opt/hl-os/data/originals/
+
+# 备份 AnythingLLM
+tar -czf "$BACKUP_DIR/anythingllm.tar.gz" /opt/hl-os/anythingllm-storage/
+
+# 备份元数据
+cp /opt/hl-os/data/metadata.json "$BACKUP_DIR/"
+
+echo "备份完成: $BACKUP_DIR"
+```
+
+**设置定时任务**:
+```bash
+# 编辑 crontab
+crontab -e
+
+# 添加每日凌晨3点备份
+0 3 * * * /opt/hl-os/scripts/backup.sh
+
+# 保留最近30天
+0 4 * * * find /opt/hl-os/backups -type d -mtime +30 -exec rm -rf {} \;
 ```
 
 ---
 
-## 🛠 日常运维
+## 5. 故障排查
 
-### 查看日志
-
-```bash
-# 查看所有服务日志（实时）
-docker-compose logs -f
-
-# 查看特定服务日志
-docker-compose logs -f backend
-docker-compose logs -f anythingllm
-docker-compose logs -f nginx
-
-# 查看最近 100 行日志
-docker-compose logs --tail=100 backend
-
-# 查看错误日志
-docker-compose logs | grep -i error
-```
-
-### 重启服务
-
-```bash
-# 重启所有服务
-docker-compose restart
-
-# 重启特定服务
-docker-compose restart backend
-docker-compose restart anythingllm
-```
-
-### 停止服务
-
-```bash
-# 停止所有服务
-docker-compose down
-
-# 停止并删除数据卷（危险操作）
-docker-compose down -v
-```
-
-### 更新代码
-
-```bash
-cd /opt/home-learning-os
-
-# 拉取最新代码
-git pull origin main
-
-# 重新部署
-./deploy.sh
-```
-
-### 查看资源使用
-
-```bash
-# 查看容器状态
-docker-compose ps
-
-# 查看资源使用（实时）
-docker stats
-
-# 查看磁盘使用
-df -h
-
-# 查看内存使用
-free -h
-```
-
----
-
-## 💾 数据备份与恢复
-
-### 备份策略
-
-**建议备份频率**:
-- AnythingLLM 向量数据: 每周备份
-- 用户上传的图书文件: 实时备份（或每日备份）
-- 配置文件: 版本控制（Git）
-
-### 备份 AnythingLLM 数据
-
-```bash
-# 停止服务（确保数据一致性）
-docker-compose stop anythingllm
-
-# 备份存储目录
-cd /opt/home-learning-os
-tar -czf anythingllm-backup-$(date +%Y%m%d-%H%M%S).tar.gz anythingllm-storage/
-
-# 上传到备份服务器或对象存储（推荐）
-# scp anythingllm-backup-*.tar.gz backup-server:/backup/
-# 或使用 rclone 上传到云存储
-
-# 重启服务
-docker-compose start anythingllm
-```
-
-### 恢复备份
-
-```bash
-# 停止服务
-docker-compose stop anythingllm
-
-# 删除旧数据
-rm -rf anythingllm-storage/
-
-# 解压备份
-tar -xzf anythingllm-backup-20260119-120000.tar.gz
-
-# 重启服务
-docker-compose start anythingllm
-```
-
-### 自动化备份脚本
-
-```bash
-# 创建备份脚本
-cat > /usr/local/bin/backup-anythingllm.sh <<'EOF'
-#!/bin/bash
-BACKUP_DIR="/backup/anythingllm"
-PROJECT_DIR="/opt/home-learning-os"
-DATE=$(date +%Y%m%d-%H%M%S)
-
-# 创建备份目录
-mkdir -p $BACKUP_DIR
-
-# 停止服务
-cd $PROJECT_DIR
-docker-compose stop anythingllm
-
-# 备份
-tar -czf $BACKUP_DIR/anythingllm-backup-$DATE.tar.gz anythingllm-storage/
-
-# 重启服务
-docker-compose start anythingllm
-
-# 删除 7 天前的备份
-find $BACKUP_DIR -name "anythingllm-backup-*.tar.gz" -mtime +7 -delete
-
-echo "Backup completed: $BACKUP_DIR/anythingllm-backup-$DATE.tar.gz"
-EOF
-
-chmod +x /usr/local/bin/backup-anythingllm.sh
-
-# 添加到 crontab（每周日凌晨 4 点备份）
-(crontab -l 2>/dev/null; echo "0 4 * * 0 /usr/local/bin/backup-anythingllm.sh >> /var/log/backup.log 2>&1") | crontab -
-```
-
----
-
-## 🐛 故障排查
-
-### 问题 1: 容器启动失败
+### 5.1 容器启动失败
 
 **症状**: `docker-compose up -d` 后容器未运行
 
@@ -686,7 +412,7 @@ docker-compose config
 - 环境变量未配置（GEMINI_API_KEY）
 - 磁盘空间不足
 
-### 问题 2: 后端健康检查失败
+### 5.2 后端健康检查失败
 
 **症状**: `curl http://localhost/api/health` 返回 502 Bad Gateway
 
@@ -715,7 +441,7 @@ docker-compose down
 docker-compose up -d
 ```
 
-### 问题 3: AnythingLLM 内存溢出
+### 5.3 AnythingLLM 内存溢出
 
 **症状**: `docker stats` 显示 AnythingLLM 内存使用接近 2GB，容器频繁重启
 
@@ -735,7 +461,7 @@ docker-compose down
 docker-compose up -d
 ```
 
-### 问题 4: 图像识别超时
+### 5.4 图像识别超时
 
 **症状**: 拍题模块识别超时，提示 "网络层解构失败"
 
@@ -752,7 +478,7 @@ curl -H "Content-Type: application/json" \
 - 使用代理服务器或 API 中继服务
 - 调整 Nginx 超时时间（`nginx.conf` 中 `proxy_read_timeout`）
 
-### 问题 5: 磁盘空间不足
+### 5.5 磁盘空间不足
 
 **症状**: `df -h` 显示根分区使用率超过 90%
 
@@ -766,160 +492,120 @@ journalctl --vacuum-time=7d
 
 # 检查大文件
 du -sh /* | sort -rh | head -10
-
-# 清理 AnythingLLM 旧向量数据（如果不再需要）
-# 谨慎操作，建议先备份
 ```
 
-### 问题 6: CentOS 8 YUM 仓库失效
+### 5.6 分片上传失败
 
-**症状**: `yum install` 提示 "Failed to download metadata"
+**症状**: 大文件上传卡住或失败
 
-**解决方案**:
+**排查步骤**:
 ```bash
-# CentOS 8 已停止维护，需切换到 CentOS Stream 或 Rocky Linux 镜像源
+# 检查后端日志
+docker-compose logs backend | grep -i "upload"
 
-# 备份原仓库配置
-mkdir -p /etc/yum.repos.d/backup
-mv /etc/yum.repos.d/*.repo /etc/yum.repos.d/backup/
+# 检查磁盘空间
+df -h /opt/hl-os/data/uploads
 
-# 使用阿里云 CentOS-Vault 镜像
-curl -o /etc/yum.repos.d/CentOS-Base.repo https://mirrors.aliyun.com/repo/Centos-vault-8.5.2111.repo
-
-# 清理缓存并更新
-yum clean all
-yum makecache
+# 检查临时目录
+ls -lh /opt/hl-os/data/uploads/temp/
 ```
 
----
+**常见原因**:
+- 磁盘空间不足（清理临时文件）
+- 分片索引超出范围
+- 文件名包含非法字符
 
-## 📊 性能监控
-
-### 安装监控工具（可选）
-
+**解决**:
 ```bash
-# 安装 htop（更友好的 top）
-yum install -y htop
+# 手动清理临时文件
+rm -rf /opt/hl-os/data/uploads/temp/*
 
-# 安装 iotop（磁盘 I/O 监控）
-yum install -y iotop
-
-# 安装 iftop（网络流量监控）
-yum install -y iftop
-```
-
-### 监控关键指标
-
-```bash
-# CPU 和内存使用
-htop
-
-# Docker 容器资源使用
-docker stats --no-stream
-
-# 磁盘 I/O
-iotop -o
-
-# 网络流量
-iftop -i eth0
-```
-
-### 配置 Prometheus + Grafana（高级）
-
-如果需要专业的监控方案，可参考 `docs/monitoring-setup.md`（待补充）。
-
----
-
-## 🔄 版本升级
-
-### 升级流程
-
-```bash
-# 1. 备份数据
-/usr/local/bin/backup-anythingllm.sh
-
-# 2. 拉取最新代码
-cd /opt/home-learning-os
-git fetch origin
-git log HEAD..origin/main  # 查看更新内容
-git pull origin main
-
-# 3. 检查变更
-git diff HEAD@{1} docker-compose.yml
-git diff HEAD@{1} .env.example
-
-# 4. 更新环境变量（如有新增）
-vim .env
-
-# 5. 重新部署
-./deploy.sh
-
-# 6. 验证升级
-docker-compose ps
-curl http://localhost/api/health
-```
-
-### 回滚版本
-
-```bash
-# 查看历史提交
-git log --oneline -10
-
-# 回滚到指定版本
-git reset --hard <commit-hash>
-
-# 重新部署
-./deploy.sh
+# 检查 cleanup 工具是否运行
+docker-compose logs backend | grep -i "cleanup"
 ```
 
 ---
 
-## 📞 技术支持
+## 6. 系统优化
 
-### 日志收集（用于问题反馈）
+### 6.1 启用 Swap 交换空间
 
 ```bash
-# 生成诊断报告
-cat > /tmp/diagnosis.sh <<'EOF'
-#!/bin/bash
-echo "=== System Info ==="
-uname -a
-free -h
-df -h
+# 检查是否已有 Swap
+swapon --show
 
-echo -e "\n=== Docker Info ==="
-docker --version
-docker-compose --version
+# 创建 2GB Swap 文件
+dd if=/dev/zero of=/swapfile bs=1M count=2048
+chmod 600 /swapfile
+mkswap /swapfile
+swapon /swapfile
 
-echo -e "\n=== Container Status ==="
-docker-compose ps
+# 永久生效（写入 /etc/fstab）
+echo '/swapfile none swap sw 0 0' >> /etc/fstab
 
-echo -e "\n=== Recent Logs ==="
-docker-compose logs --tail=50
+# 调整 Swap 使用策略
+sysctl vm.swappiness=10
+echo 'vm.swappiness=10' >> /etc/sysctl.conf
+```
+
+### 6.2 优化文件描述符限制
+
+```bash
+# 永久生效
+cat >> /etc/security/limits.conf <<EOF
+* soft nofile 65535
+* hard nofile 65535
+EOF
+```
+
+### 6.3 调整内核参数
+
+```bash
+cat >> /etc/sysctl.conf <<EOF
+# 网络优化
+net.core.somaxconn = 1024
+net.ipv4.tcp_max_syn_backlog = 2048
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_fin_timeout = 30
+
+# 内存优化
+vm.overcommit_memory = 1
+vm.max_map_count = 262144
 EOF
 
-chmod +x /tmp/diagnosis.sh
-bash /tmp/diagnosis.sh > /tmp/diagnosis.log 2>&1
-
-# 下载诊断报告
-# scp root@your-server:/tmp/diagnosis.log ./
+# 应用配置
+sysctl -p
 ```
 
-### 联系方式
+### 6.4 Docker 镜像加速
 
-- **项目地址**: <your-repo-url>
-- **问题反馈**: <your-issues-url>
-- **技术文档**: docs/plans/
+```bash
+# 创建 Docker 配置目录
+mkdir -p /etc/docker
+
+# 配置镜像加速
+cat > /etc/docker/daemon.json <<EOF
+{
+  "registry-mirrors": [
+    "https://mirror.ccs.tencentyun.com",
+    "https://docker.mirrors.ustc.edu.cn"
+  ],
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "100m",
+    "max-file": "3"
+  }
+}
+EOF
+
+# 重启 Docker
+systemctl daemon-reload
+systemctl restart docker
+```
 
 ---
 
-## 📚 扩展阅读
-
-- [Docker 官方文档](https://docs.docker.com/)
-- [AnythingLLM 官方文档](https://docs.anythingllm.com/)
-- [Gemini API 文档](https://ai.google.dev/docs)
-- [CentOS 8 迁移指南](https://www.centos.org/centos-stream/)
-
----
-
-**祝部署顺利！如有问题，请提交 Issue。**
+**相关文档**:
+- [技术架构](./ARCHITECTURE.md) - 系统架构设计
+- [安全配置](./SECURITY.md) - 安全加固指南
+- [用户手册](./USER_GUIDE.md) - 功能使用说明

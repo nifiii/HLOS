@@ -171,67 +171,112 @@
 
 ## 🚀 快速开始
 
-### 前置要求
+### 开发环境 (本地)
 
-- **操作系统**: CentOS 8.2 或其他 Linux 发行版
-- **硬件配置**: 最低 2 核 4GB 内存，推荐 50GB 磁盘空间
-- **软件依赖**:
-  - Docker >= 20.10
-  - Docker Compose >= 2.0
-  - Git
-- **API Key**: Google Gemini API Key (申请地址: [Google AI Studio](https://aistudio.google.com/))
+#### 前置要求
+- Node.js 18+
+- npm 或 yarn
 
-### 一键部署
+#### 启动步骤
 
-**步骤 1: 克隆代码**
+**前端开发**:
+```bash
+npm install
+npm run dev
+# 访问 http://localhost:5173
+```
+
+**后端开发**:
+```bash
+cd backend
+npm install
+npm run dev
+# 访问 http://localhost:3000
+```
+
+**AnythingLLM 本地启动**:
+```bash
+docker run -d \
+  -p 3001:3001 \
+  -e LLM_PROVIDER=gemini \
+  -e GEMINI_API_KEY=your_key \
+  mintplexlabs/anythingllm:latest
+```
+
+---
+
+### 生产环境 (服务器部署)
+
+#### 前置要求
+
+- **操作系统**: CentOS 8+ / Ubuntu 20.04+
+- **硬件配置**: 2核4G内存, 50GB硬盘 (推荐)
+- **API Key**: [Google AI Studio](https://aistudio.google.com/)
+
+#### 一键部署
+
+**方式1: 已安装依赖 (推荐)**
 ```bash
 git clone <repository-url>
-cd home-learning-os
-```
+cd HL-os
 
-**步骤 2: 配置环境变量**
-```bash
-# 复制环境变量模板
+# 配置环境变量
 cp .env.example .env
+vim .env  # 填入 GEMINI_API_KEY
 
-# 编辑 .env 文件,填入你的 API Key
-nano .env
-```
-
-`.env` 文件示例:
-```bash
-# Google Gemini API Key (必需)
-GEMINI_API_KEY=your_google_gemini_api_key_here
-
-# AnythingLLM API Key (自动生成,可自定义)
-# 生成方式: openssl rand -hex 32
-ANYTHINGLLM_API_KEY=your_anythingllm_api_key_here
-
-# 环境模式
-NODE_ENV=production
-```
-
-**步骤 3: 执行部署脚本**
-```bash
-# 赋予执行权限
+# 一键部署
 chmod +x deploy.sh
-
-# 运行一键部署
-./deploy.sh
+sudo ./deploy.sh
 ```
 
-部署脚本会自动：
-1. 构建前端静态文件
-2. 安装后端依赖
-3. 启动 Docker 容器（Nginx + Backend + AnythingLLM）
-4. 执行健康检查
+**方式2: 自动安装依赖**
+```bash
+# 首次部署自动安装 Node.js/Nginx/Docker
+sudo ./deploy.sh --with-deps
+```
 
-**步骤 4: 访问应用**
+#### 部署架构 (混合部署优化)
 
-部署成功后，在浏览器访问:
+部署脚本采用**混合部署方案**,相比全Docker节省~500MB内存:
+
+| 组件 | 部署方式 | 资源占用 |
+|------|----------|----------|
+| 前端 | 系统 Nginx | ~10MB |
+| 后端 | systemd 服务 | ~200MB |
+| AnythingLLM | Docker 容器 | ~800MB |
+| **总计** | | **~1GB** |
+
+#### 访问应用
+
+部署成功后:
 - **前端**: http://your-server-ip
-- **后端健康检查**: http://your-server-ip/api/health
-- **AnythingLLM 管理界面**: http://your-server-ip:3001
+- **健康检查**: http://your-server-ip/health
+- **后端API**: http://your-server-ip/api/
+
+#### 管理命令
+
+```bash
+# 后端管理
+journalctl -u hl-backend -f          # 查看日志
+systemctl restart hl-backend       # 重启服务
+systemctl status hl-backend        # 查看状态
+
+# Nginx 管理
+systemctl reload nginx             # 重载配置
+tail -f /var/log/nginx/error.log    # 查看日志
+
+# AnythingLLM 管理
+docker logs -f hl-anythingllm         # 查看日志
+docker restart hl-anythingllm      # 重启容器
+docker stop hl-anythingllm         # 停止容器
+```
+
+#### 详细文档
+
+- 📖 [部署指南](docs/DEPLOYMENT.md) - 完整部署步骤与故障排查
+- 🔒 [安全配置](docs/SECURITY.md) - HTTPS/Nginx Basic Auth/防火墙
+- 🏗️ [技术架构](docs/ARCHITECTURE.md) - 系统架构设计
+- 📚 [用户手册](docs/USER_GUIDE.md) - 功能使用说明
 
 ---
 
@@ -441,7 +486,7 @@ home-learning-os/
 3. 配置Nginx: 参考 `docs/NGINX_BASIC_AUTH.md`
 4. 重启服务: `sudo systemctl restart nginx`
 
-**详细文档**: [Nginx Basic Auth 配置指南](docs/NGINX_BASIC_AUTH.md)
+**详细文档**: [安全配置指南](docs/SECURITY.md)
 
 ### API Key 保护
 

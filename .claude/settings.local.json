@@ -64,7 +64,20 @@
       "Bash(git -C \"D:\\\\devops\\\\HL-os\" log --oneline -10)",
       "Bash(git -C \"D:\\\\devops\\\\HL-os\" show 1bca223 --stat)",
       "Bash(git -C \"D:\\\\devops\\\\HL-os\" show 1bca223)",
-      "Bash(git show:*)"
+      "Bash(git show:*)",
+      "Bash(git -C \"D:\\\\devops\\\\HL-os\" checkout master)",
+      "Bash(git -C \"D:\\\\devops\\\\HL-os\" pull origin master)",
+      "Bash(git -C \"D:\\\\devops\\\\HL-os\" merge feature/chunked-upload)",
+      "Bash(git -C \"D:\\\\devops\\\\HL-os\" log --oneline --graph --all -10)",
+      "Bash(git -C \"D:\\\\devops\\\\HL-os\" branch -d feature/chunked-upload)",
+      "Bash(git -C \"D:\\\\devops\\\\HL-os\" worktree remove .worktrees/chunked-upload)",
+      "Bash(git -C \"D:\\\\devops\\\\HL-os\" worktree remove:*)",
+      "Bash(git -C \"D:\\\\devops\\\\HL-os\" status)",
+      "Bash(git -C \"D:\\\\devops\\\\HL-os\" add README.md docs/PROJECT_OVERVIEW.md)",
+      "Bash(git -C \"D:\\\\devops\\\\HL-os\" commit -m \"docs: update README and PROJECT_OVERVIEW for chunked upload feature\")",
+      "Bash(git -C \"D:\\\\devops\\\\HL-os\" ls -la docs/)",
+      "Bash(wc:*)",
+      "Bash(ls:*)"
     ]
   }
 }
