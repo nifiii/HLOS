@@ -111,12 +111,37 @@ router.post('/upload-book', upload.single('file'), async (req: Request, res: Res
 });
 
 /**
- * POST /api/upload-book
- * 通过文件路径解析已上传的图书
+ * 根据 MIME 类型获取文件格式
  */
-router.post('/upload-book', async (req: Request, res: Response) => {
+function getFileFormat(mimeType: string): 'pdf' | 'epub' | 'txt' {
+  if (mimeType === 'application/pdf') {
+    return 'pdf';
+  } else if (mimeType === 'application/epub+zip') {
+    return 'epub';
+  } else if (mimeType === 'text/plain') {
+    return 'txt';
+  }
+  throw new Error(`未知的 MIME 类型: ${mimeType}`);
+}
+
+/**
+ * 根据文件名获取文件格式
+ */
+function getFileFormatFromFileName(fileName: string): 'pdf' | 'epub' | 'txt' {
+  const ext = path.extname(fileName).toLowerCase();
+  if (ext === '.pdf') return 'pdf';
+  if (ext === '.epub') return 'epub';
+  if (ext === '.txt') return 'txt';
+  return 'pdf'; // 默认
+}
+
+/**
+ * POST /api/upload-book/parse
+ * 解析已上传的图书文件（通过文件路径）
+ */
+router.post('/upload-book/parse', async (req: Request, res: Response) => {
   try {
-    const { filePath, fileName, ownerId } = req.body;
+    const { filePath, fileName } = req.body;
 
     if (!filePath || !fileName) {
       return res.status(400).json({
@@ -184,8 +209,6 @@ router.post('/upload-book', async (req: Request, res: Response) => {
         fileFormat,
         fileSize: fileBuffer.length,
         pageCount: parseResult.pageCount,
-        content: parseResult.content,
-        // 合并初步元数据和 AI 元数据
         metadata: {
           ...parseResult.estimatedMetadata,
           ...aiMetadata,
@@ -201,30 +224,5 @@ router.post('/upload-book', async (req: Request, res: Response) => {
     });
   }
 });
-
-/**
- * 根据 MIME 类型获取文件格式
- */
-function getFileFormat(mimeType: string): 'pdf' | 'epub' | 'txt' {
-  if (mimeType === 'application/pdf') {
-    return 'pdf';
-  } else if (mimeType === 'application/epub+zip') {
-    return 'epub';
-  } else if (mimeType === 'text/plain') {
-    return 'txt';
-  }
-  throw new Error(`未知的 MIME 类型: ${mimeType}`);
-}
-
-/**
- * 根据文件名获取文件格式
- */
-function getFileFormatFromFileName(fileName: string): 'pdf' | 'epub' | 'txt' {
-  const ext = path.extname(fileName).toLowerCase();
-  if (ext === '.pdf') return 'pdf';
-  if (ext === '.epub') return 'epub';
-  if (ext === '.txt') return 'txt';
-  return 'pdf'; // 默认
-}
 
 export default router;

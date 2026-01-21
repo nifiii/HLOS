@@ -69,8 +69,8 @@ export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, own
       console.log('✅ 分片上传完成，开始解析图书...');
 
       try {
-        // 读取已上传的文件并调用解析接口
-        const parseResponse = await fetch('/api/upload-book', {
+        // 调用新的解析接口
+        const parseResponse = await fetch('/api/upload-book/parse', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -87,7 +87,13 @@ export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, own
           // 更新 uploadResult，包含解析后的元数据
           setUploadResult({
             ...result,
-            metadata: parseData.data.metadata
+            metadata: {
+              ...parseData.data.metadata,
+              fileName: parseData.data.fileName,
+              fileFormat: parseData.data.fileFormat,
+              fileSize: parseData.data.fileSize,
+              pageCount: parseData.data.pageCount,
+            }
           });
 
           // 显示编辑器
@@ -136,7 +142,7 @@ export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, own
       content: '', // 内容不传给前端，只保存元数据
       metadata: {
         ...metadata,
-        tableOfContents: uploadResult.metadata?.tableOfContents || []
+        tableOfContents: []
       }
     };
 
