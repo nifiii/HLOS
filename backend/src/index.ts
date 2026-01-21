@@ -11,6 +11,7 @@ import saveBookRouter from './routes/saveBook.js';
 import booksRouter from './routes/books.js';
 import authRouter from './routes/auth.js';
 import uploadChunkRouter from './routes/upload-chunk.js';
+import { cleanupTempChunks } from './utils/cleanup.js';
 
 dotenv.config();
 
@@ -69,4 +70,12 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 app.listen(PORT, () => {
   console.log(`✅ Backend server running on port ${PORT}`);
   console.log(`📍 Health check: http://localhost:${PORT}/api/health`);
+
+  // 启动时清理一次过期文件
+  cleanupTempChunks().catch(console.error);
+
+  // 定期清理（每小时）
+  setInterval(() => {
+    cleanupTempChunks().catch(console.error);
+  }, 60 * 60 * 1000);
 });
