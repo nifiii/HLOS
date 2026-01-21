@@ -10,6 +10,7 @@ import scannedItemsRouter from './routes/scannedItems.js';
 import saveBookRouter from './routes/saveBook.js';
 import booksRouter from './routes/books.js';
 import authRouter from './routes/auth.js';
+import uploadChunkRouter from './routes/upload-chunk.js';
 
 dotenv.config();
 
@@ -46,6 +47,7 @@ app.use('/api', saveScannedItemRouter);
 app.use('/api', scannedItemsRouter);
 app.use('/api', saveBookRouter);
 app.use('/api', booksRouter);
+app.use('/api', uploadChunkRouter);
 
 // 404 处理
 app.use((req, res) => {
