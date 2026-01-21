@@ -10,9 +10,19 @@
 
 ### 1. 多角色逻辑隔离 (Multi-Profile)
 - 支持多子女家庭（如：大宝、二宝）
-- 数据完全隔离：每个孩子的错题、笔记、图书、学习进度独立存储
-- 快速切换身份：顶部/侧边栏一键切换当前学生视角
-- 家庭共享资源：支持教材、参考书等资源共享
+- **快速切换按钮**：顶部导航栏专属切换按钮，显示当前用户
+  - 下拉菜单展示所有可选用户
+  - 当前用户高亮显示（背景色 + 对勾标记）
+  - 点击外部自动关闭菜单
+- **视觉反馈**：切换后显示 Toast 提示（2秒自动消失）
+  - 渐变背景（sky-400 to mint-400）
+  - 滑入/淡出动画效果
+- **智能记忆**：LocalStorage 记住上次使用的孩子
+  - 下次打开自动进入上次用户的视图
+  - 带错误处理（隐私模式降级）
+- **数据隔离规则**：
+  - **个人数据**：错题本、学习笔记、原始图片、AI课件、AI测验、OCR试卷作业、Dashboard统计
+  - **共享数据**：图书馆电子教材（所有孩子可见）
 
 ### 2. 智能拍题录入 (AI Capture & OCR)
 - **引擎**: `gemini-3-flash-preview` (Vision)
@@ -112,6 +122,7 @@
 - **构建工具**: Vite 5.0
 - **样式**: Tailwind CSS (Utility-first)
 - **图标**: Lucide React
+- **动画**: Framer Motion (Toast 提示、页面过渡)
 - **数据存储**: 服务端 API + 文件系统（见下方数据架构）
 
 #### 后端
@@ -226,8 +237,10 @@ chmod +x deploy.sh
    - Android: Chrome → 菜单 → 添加到主屏幕
 
 2. **切换学生身份**:
-   - 点击顶部头像图标
-   - 选择大宝/二宝
+   - 点击顶部"切换到：XXX"按钮
+   - 从下拉菜单中选择目标用户
+   - 查看顶部 Toast 提示确认切换成功
+   - Dashboard 数据自动更新为当前用户的统计
 
 3. **拍题录入**:
    - 进入"拍题"模块
@@ -365,7 +378,7 @@ home-learning-os/
 │   │       └── epubParser.ts
 │   ├── package.json
 │   └── tsconfig.json
-├── components/               # React 组件 (14个)
+├── components/               # React 组件 (15个)
 │   ├── Layout.tsx            # 布局框架
 │   ├── Dashboard.tsx         # 数据看板
 │   ├── CaptureModule.tsx     # 拍题模块
@@ -374,6 +387,7 @@ home-learning-os/
 │   ├── LibraryHub.tsx        # 图书馆
 │   ├── StudyRoom.tsx         # 学习园地
 │   ├── LiveTutor.tsx         # 实时语音辅导
+│   ├── UserSwitcher.tsx      # 用户切换器（快速切换按钮）
 │   ├── BookCard.tsx          # 图书卡片
 │   ├── BookUploader.tsx      # 图书上传器
 │   ├── BookMetadataEditor.tsx# 元数据编辑器
@@ -516,6 +530,14 @@ npm run build
   - React 前端 + Express 后端
   - Docker 容器化部署
   - 多用户数据隔离
+  - **用户切换优化** (2026-01-21)
+    - 快速切换按钮（下拉菜单）
+    - Toast 视觉反馈
+    - LocalStorage 智能记忆
+  - **访问控制简化** (2026-01-20)
+    - 移除前端 PIN 认证
+    - 采用 Nginx Basic Auth
+    - 信任平等设计理念
 
 - [x] 阶段 2: 核心功能 (✅ 已完成)
   - 智能拍题 OCR
@@ -523,7 +545,7 @@ npm run build
   - AI 学习园地
   - 智能考场
 
-- [ ] 阶段 3: AnythingLLM 深度集成 (🚧 进行中)
+- [x] 阶段 3: AnythingLLM 深度集成 (✅ 已完成)
   - PDF/EPUB/TXT 解析
   - 文档向量化索引
   - RAG 检索优化
