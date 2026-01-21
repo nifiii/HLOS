@@ -1,4 +1,4 @@
-import { ScannedItem, EBook } from '../types';
+import { ScannedItem, EBook, IndexStatus } from '../types';
 
 /**
  * API ���务层
@@ -207,13 +207,12 @@ export async function fetchBookById(id: string): Promise<EBook | null> {
       fileSize: item.fileSize,
       uploadedAt: item.uploadedAt,
       ownerId: item.ownerId,
-      filePath: item.filePath,
       subject: item.subject,
       category: '教材',
       grade: item.metadata?.grade || '',
       tags: item.metadata?.tags || [],
       tableOfContents: [],
-      indexStatus: 'INDEXED',
+      indexStatus: IndexStatus.INDEXED,
       anythingLlmDocId: item.anythingLlmDocId,
     };
   } catch (error) {

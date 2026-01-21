@@ -9,7 +9,7 @@ import ExamCenter from './components/ExamCenter';
 import LibraryHub from './components/LibraryHub';
 import StudyRoom from './components/StudyRoom';
 import LiveTutor from './components/LiveTutor';
-import { ScannedItem, UserProfile, EBook } from './types';
+import { ScannedItem, UserProfile, EBook, KnowledgeStatus, ProcessingStatus } from './types';
 import { fetchBooks, fetchScannedItems } from './services/apiService';
 
 const FAMILY_PROFILES: UserProfile[] = [
@@ -57,10 +57,10 @@ const App: React.FC = () => {
             type: item.meta.type as any,
             subject: item.meta.subject,
             chapter_hint: item.meta.chapter,
-            knowledge_status: 'unknown',
+            knowledge_status: KnowledgeStatus.UNMASTERED,
             problems: [],
           },
-          status: 'processed' as const,
+          status: ProcessingStatus.PROCESSED,
         }));
         setScannedItems(scannedItemData);
       } catch (error) {

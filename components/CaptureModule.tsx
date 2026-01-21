@@ -65,11 +65,11 @@ const CaptureModule: React.FC<CaptureModuleProps> = ({ onScanComplete, currentUs
         // 1. 保存到服务器（文件系统 + AnythingLLM）
         const paths = await saveScannedItemToServer(reviewItem, preview);
 
-        // 2. 添加文件路径到数据
+        // 2. 更新文件路径到数据
         const savedItem: ScannedItem = {
           ...reviewItem,
-          mdPath: paths.mdPath,
-          imagePath: paths.imagePath,
+          imageUrl: paths.imagePath, // 使用服务端图片路径
+          rawMarkdown: '', // 稍后按需加载完整内容
         };
 
         // 3. 触发父组件回调
@@ -207,7 +207,7 @@ const CaptureModule: React.FC<CaptureModuleProps> = ({ onScanComplete, currentUs
           >
             {isSaving ? (
               <>
-                <LoadingSpinner size="sm" className="mr-2" />
+                <LoadingSpinner size={20} className="mr-2" />
                 保存中...
               </>
             ) : (
