@@ -372,15 +372,16 @@ docker rm hl-anythingllm 2>/dev/null || true
 echo "   → 预创建数据库文件..."
 mkdir -p $INSTALL_DIR/anythingllm-storage
 mkdir -p $INSTALL_DIR/anythingllm-hotdir
+mkdir -p $INSTALL_DIR/anythingllm-storage/comkey
+mkdir -p $INSTALL_DIR/anythingllm-storage/documents
+mkdir -p $INSTALL_DIR/anythingllm-storage/vector-cache
 touch $INSTALL_DIR/anythingllm-storage/anythingllm.db
 touch $INSTALL_DIR/anythingllm-storage/anythingllm.db-journal 2>/dev/null || true
 
 # 设置宽松权限
 echo "   → 设置存储目录权限..."
-chmod 777 $INSTALL_DIR/anythingllm-storage
+chmod -R 777 $INSTALL_DIR/anythingllm-storage
 chmod 777 $INSTALL_DIR/anythingllm-hotdir
-chmod 666 $INSTALL_DIR/anythingllm-storage/anythingllm.db
-[ -f $INSTALL_DIR/anythingllm-storage/anythingllm.db-journal ] && chmod 666 $INSTALL_DIR/anythingllm-storage/anythingllm.db-journal
 
 # 启动容器 (使用 docker run 替代 docker-compose)
 echo "   → 启动容器..."
