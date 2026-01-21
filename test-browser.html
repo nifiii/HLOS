@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>浏览器扩展检测 - 智学 OS</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .info-box {
+            background: #f0f9ff;
+            border-left: 4px solid #0ea5e9;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .warning-box {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .success-box {
+            background: #d1fae5;
+            border-left: 4px solid #10b981;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        code {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        pre {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+        h1 { color: #0f172a; }
+        h2 { color: #334155; margin-top: 30px; }
+        ul { margin: 10px 0; }
+        li { margin: 5px 0; }
+    </style>
+</head>
+<body>
+    <h1>🔍 浏览器扩展干扰检测</h1>
+
+    <div class="info-box">
+        <strong>检测目的：</strong>排查首次访问网站时出现的错误覆盖层是否由浏览器扩展引起。
+    </div>
+
+    <h2>📋 测试步骤</h2>
+
+    <div class="warning-box">
+        <strong>⚠️ 在无痕模式（隐私模式）下测试</strong>
+        <ul>
+            <li><strong>Chrome/Edge:</strong> <code>Ctrl + Shift + N</code></li>
+            <li><strong>Firefox:</strong> <code>Ctrl + Shift + P</code></li>
+            <li><strong>Safari:</strong> <code>Command + Shift + N</code></li>
+        </ul>
+    </div>
+
+    <h2>🧪 测试流程</h2>
+
+    <ol>
+        <li>
+            <strong>打开无痕模式</strong>
+            <p>确保所有扩展默认被禁用</p>
+        </li>
+
+        <li>
+            <strong>访问测试网站</strong>
+            <p>打开: <code>https://jia.haokuai.uk</code></p>
+        </li>
+
+        <li>
+            <strong>观察结果</strong>
+            <ul>
+                <li>✅ <strong>无覆盖层</strong> → 确认是浏览器扩展引起</li>
+                <li>❌ <strong>仍有覆盖层</strong> → 可能是网站代码问题</li>
+            </ul>
+        </li>
+
+        <li>
+            <strong>如果是扩展引起</strong>
+            <p>在普通模式下逐个禁用扩展，找出罪魁祸首：</p>
+            <ul>
+                <li><strong>Chrome:</strong> 设置 → 扩展程序 → 管理扩展</li>
+                <li><strong>Firefox:</strong> 附加组件 → 扩展</li>
+                <li><strong>Edge:</strong> 扩展 → 管理扩展</li>
+            </ul>
+        </li>
+    </ol>
+
+    <h2>🔧 常见干扰扩展</h2>
+
+    <div class="warning-box">
+        <strong>可能引起问题的扩展类型：</strong>
+        <ul>
+            <li>🛡️ 广告拦截器（AdBlock, uBlock Origin）</li>
+            <li>🌐 翻译扩展（Google 翻译, 沙拉查词）</li>
+            <li>✏️ 语法检查（Grammarly, LanguageTool）</li>
+            <li>🔒 隐私保护（Privacy Badger, Ghostery）</li>
+            <li>🎨 样式修改（Stylus, Dark Reader）</li>
+            <li>🛒 购物助手（导购插件）</li>
+        </ul>
+    </div>
+
+    <h2>📸 测试结果记录</h2>
+
+    <div class="info-box">
+        <strong>请在测试后记录结果：</strong>
+        <ul>
+            <li>无痕模式下是否出现覆盖层？是/否</li>
+            <li>如果无覆盖层，禁用哪个扩展后问题消失？</li>
+            <li>覆盖层的具体文字内容是什么？</li>
+            <li>覆盖层有没有"关闭"按钮？</li>
+        </ul>
+    </div>
+
+    <h2>💡 临时解决方案</h2>
+
+    <div class="success-box">
+        <strong>如果确认是扩展问题：</strong>
+        <ul>
+            <li>在该网站禁用特定扩展</li>
+            <li>或者添加网站到扩展的白名单</li>
+            <li>或者使用无痕模式访问（临时方案）</li>
+        </ul>
+    </div>
+
+    <h2>🔗 技术细节</h2>
+
+    <p>如果是网站代码问题（而非扩展），可能的原因：</p>
+    <ul>
+        <li>React 开发模式错误覆盖层</li>
+        <li>第三方脚本注入（如 Google Analytics, CDN 脚本）</li>
+        <li>Service Worker 缓存问题</li>
+        <li>Vite 构建配置问题</li>
+    </ul>
+
+    <script>
+        // 检测浏览器环境
+        console.log('=== 浏览器环境信息 ===');
+        console.log('User Agent:', navigator.userAgent);
+        console.log('语言:', navigator.language);
+        console.log('Cookie 启用:', navigator.cookieEnabled);
+        console.log('在线状态:', navigator.onLine);
+
+        // 检测扩展（部分扩展会注入全局对象）
+        const hasExtensions = (
+            window.chrome?.runtime ||
+            window.browser?.runtime ||
+            typeof Harmony !== 'undefined' ||
+            typeof _webstoreActivity !== 'undefined'
+        );
+
+        console.log('检测到扩展迹象:', hasExtensions);
+
+        // 检测覆盖层
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                const overlays = document.querySelectorAll('[style*="position: fixed"], [style*="z-index"]');
+                console.log('检测到固定定位元素:', overlays.length);
+                overlays.forEach((el, i) => {
+                    console.log(`覆盖层 ${i + 1}:`, el.tagName, el.textContent?.substring(0, 50));
+                });
+            }, 2000);
+        });
+    </script>
+</body>
+</html>
