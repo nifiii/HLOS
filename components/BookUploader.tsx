@@ -82,7 +82,7 @@ export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, own
 
         if (parseResponse.ok) {
           const parseData = await parseResponse.json();
-          console.log('✅ AI 解析成功:', parseData.data);
+          console.log('✅ 图书元数据提取成功:', parseData.data);
 
           // 更新 uploadResult，包含解析后的元数据
           setUploadResult({
@@ -104,7 +104,7 @@ export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, own
           throw new Error('解析失败');
         }
       } catch (error) {
-        console.error('❌ AI 解析失败，使用默认信息:', error);
+        console.error('❌ 元数据提取失败，使用默认信息:', error);
 
         // 解析失败时使用默认元数据
         const defaultMetadata = {
