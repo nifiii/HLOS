@@ -39,6 +39,9 @@ router.post('/upload-chunk', upload.single('chunk'), async (req: Request, res: R
 
     await ensureDirs();
 
+    console.log('收到的 req.body:', req.body);
+    console.log('收到的 req.file:', req.file ? '存在' : '不存在');
+
     const { chunkIndex, totalChunks, fileId, fileName, ownerId } = req.body;
 
     if (!req.file) {
@@ -47,6 +50,7 @@ router.post('/upload-chunk', upload.single('chunk'), async (req: Request, res: R
 
     // 验证参数
     if (chunkIndex === undefined || totalChunks === undefined || !fileId || !fileName || !ownerId) {
+      console.error('参数验证失败:', { chunkIndex, totalChunks, fileId, fileName, ownerId });
       return res.status(400).json({ success: false, error: '缺少必要参数' });
     }
 
