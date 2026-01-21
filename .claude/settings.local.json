@@ -52,7 +52,19 @@
       "Bash(git -c user.name=\"aman\" -c user.email=\"aifiiiiifia@gmail.com\" commit -m \"fix: 修复配套测验生成参数不匹配问题并优化功能\n\n前端修改：\n- QuizGenerator 添加 studentName 参数\n- 修正 API 请求参数：chapter \\(不是 chapterTitle\\)、添加 studentName\n- 修正响应解析：result.data \\(不是 result.data.markdown\\)\n- 添加完整的错误处理（404/429/503/401/500等状态码）\n- StudyRoom 传递 studentName={currentUser.name} 给 QuizGenerator\n\n后端修改：\n- 接受前端实际发送的参数：bookTitle, subject, chapter, studentName, wrongProblems, coursewareContent\n- 构建详细的错题上下文（包含学生答案、正确答案、错因分析）\n- 利用课件内容作为上下文（前1000字）\n- 改进 prompt：明确题目数量、难度分布、针对薄弱环节\n- 切换到 gemini-3-flash-preview 避免配额问题\n- 添加 429 配额超限专门处理\n- 统一错误处理风格\n\n解决用户报告的问题：''缺少必需参数: request, contextItems, studentName''\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\")",
       "Bash(cd:*)",
       "WebSearch",
-      "Bash(git worktree add:*)"
+      "Bash(git worktree add:*)",
+      "Skill(superpowers:using-git-worktrees)",
+      "Bash(git check-ignore:*)",
+      "Skill(superpowers:finishing-a-development-branch)",
+      "Bash(git merge:*)",
+      "Bash(git branch:*)",
+      "Bash(git worktree:*)",
+      "Skill(superpowers:subagent-driven-development)",
+      "Bash(git -C D:devopsHL-os.worktreeschunked-upload log --oneline -5)",
+      "Bash(git -C \"D:\\\\devops\\\\HL-os\" log --oneline -10)",
+      "Bash(git -C \"D:\\\\devops\\\\HL-os\" show 1bca223 --stat)",
+      "Bash(git -C \"D:\\\\devops\\\\HL-os\" show 1bca223)",
+      "Bash(git show:*)"
     ]
   }
 }
