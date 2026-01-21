@@ -162,44 +162,76 @@ router.post('/upload-book/parse', async (req: Request, res: Response) => {
     }
 
     console.log(`开始解析已上传文件: ${fileName}`);
+    console.log(`文件路径: ${fullPath}`);
+    console.log(`文件大小: ${fileBuffer.length} bytes`);
 
     // 读取文件
     const fileBuffer = await fs.readFile(fullPath);
     const fileFormat = getFileFormatFromFileName(fileName);
 
+    console.log(`文件格式: ${fileFormat}`);
+
     let parseResult;
 
-    switch (fileFormat) {
-      case 'pdf':
-        parseResult = await parsePDF(fileBuffer);
-        break;
-      case 'epub':
-        parseResult = await parseEPUB(fileBuffer);
-        break;
-      case 'txt':
-        parseResult = {
-          content: fileBuffer.toString('utf-8'),
-          pageCount: 1,
-          estimatedMetadata: {},
-          tableOfContents: [],
-        };
-        break;
-      default:
-        return res.status(400).json({
-          success: false,
-          error: `不支持的文件格式: ${fileFormat}`
-        });
+    try {
+      switch (fileFormat) {
+        case 'pdf':
+          console.log('开始 PDF 解析...');
+          parseResult = await parsePDF(fileBuffer);
+          console.log(`PDF 解析成功，页数: ${parseResult.pageCount}`);
+          break;
+        case 'epub':
+          console.log('开始 EPUB 解析...');
+          parseResult = await parseEPUB(fileBuffer);
+          console.log(`EPUB 解析成功，页数: ${parseResult.pageCount}`);
+          break;
+        case 'txt':
+          parseResult = {
+            content: fileBuffer.toString('utf-8'),
+            pageCount: 1,
+            estimatedMetadata: {},
+            tableOfContents: [],
+          };
+          break;
+        default:
+          return res.status(400).json({
+            success: false,
+            error: `不支持的文件格式: ${fileFormat}`
+          });
+      }
+
+      console.log(`文本内容长度: ${parseResult.content.length} 字符`);
+      console.log(`目录章节数: ${parseResult.tableOfContents.length}`);
+    } catch (parseError) {
+      console.error('文件解析失败:', parseError);
+      return res.status(500).json({
+        success: false,
+        error: `文件解析失败: ${parseError instanceof Error ? parseError.message : '未知错误'}`
+      });
     }
 
     // 使用 Gemini 分析元数据
     console.log('开始 AI 元数据分析...');
-    const aiMetadata = await analyzeBookMetadata(
-      parseResult.content,
-      parseResult.tableOfContents,
-      fileName
-    );
-
-    console.log('AI 解析完成');
+    let aiMetadata;
+    try {
+      aiMetadata = await analyzeBookMetadata(
+        parseResult.content,
+        parseResult.tableOfContents,
+        fileName
+      );
+      console.log('AI 解析完成:', JSON.stringify(aiMetadata, null, 2));
+    } catch (aiError) {
+      console.error('AI 分析失败:', aiError);
+      // AI 失败时使用默认元数据
+      aiMetadata = {
+        title: fileName.replace(/\.(pdf|epub|txt)$/i, ''),
+        author: '',
+        subject: '',
+        category: '教材',
+        grade: '',
+        tags: []
+      };
+    }
 
     // 返回解析结果和 AI 元数据
     return res.json({
