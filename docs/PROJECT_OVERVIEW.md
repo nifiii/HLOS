@@ -159,11 +159,13 @@
 
 **功能描述**:
 - 个性化欢迎语（根据时段：早安/下午好/晚上好）
+- ✅ **实时统计**: 基于扫描数据实时计算今日/本周收录、错题总数、掌握率
+- ✅ **趋势可视化**: 最近7天学习趋势折线图（Recharts）
 - 4个统计卡片：
-  - 总收录数 (所有ScannedItem)
-  - 待复习数 (WRONG_PROBLEM类型)
-  - 本周学习 (静态数据，待接入真实统计)
-  - 掌握率 (NOTE类型占比)
+  - 今日收录 (当天扫描的错题/笔记数量)
+  - 本周收录 (最近7天新增数量)
+  - 待复习（错题） (状态为WRONG的题目总数)
+  - 掌握率 (CORRECT/(CORRECT+WRONG)百分比，动态颜色)
 - 最近学习时间轴 (最近5条记录)
 - 快捷入口网格 (4个常用功能)
 
@@ -172,11 +174,21 @@
 App.tsx
   → filteredItems (useMemo过滤当前用户数据)
   → Dashboard props
-  → 实时统计计算
+  → useDashboardStats Hook (实时计算统计)
+  → TrendChart组件 (趋势图渲染)
 ```
 
+**Hook**: `hooks/useDashboardStats.ts`
+- `todayCount`: 今日收录数 (timestamp >= 今天0点)
+- `weekCount`: 本周收录数 (timestamp >= 7天前)
+- `totalWrong`: 错题总数 (meta.problems[].status === 'wrong')
+- `masteryRate`: 掌握率百分比 (correct/(correct+wrong)*100)
+- `last7Days`: 最近7天趋势数组 [{date: "01-20", count: 5}, ...]
+
 **交互行为**:
-- 统计卡片显示趋势箭头 (TrendingUp图标 + 百分比)
+- 统计卡片显示动态趋势指示器
+- 掌握率卡片根据分数动态变色 (≥80%绿色，≥60%黄色，<60%红色)
+- 趋势图支持鼠标悬停显示详细数据
 - 快捷入口按钮 hover 时图标旋转6度 + 背景色过渡
 - 点击快捷入口切换到对应Tab
 
@@ -184,6 +196,7 @@ App.tsx
 - 渐变色欢迎区 (`from-sky-400 to-mint-400`)
 - 统计卡片使用学科颜色系统 (20%透明度背景)
 - 时间轴垂直线 (0.5宽度灰色分隔符)
+- 趋势图使用品牌色 (#4A90E2)
 
 ---
 
