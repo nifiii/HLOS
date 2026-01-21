@@ -39,7 +39,7 @@ const UploadProgressBar: React.FC<UploadProgressBarProps> = ({ progress, fileNam
       <div className="space-y-2">
         <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-brand-400 to-brand-600 rounded-full transition-all duration-300 ease-out"
+            className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full transition-all duration-300 ease-out"
             style={{ width: `${progress.percentage}%` }}
           ></div>
         </div>

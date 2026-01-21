@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Upload, FileText, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { EBook, IndexStatus } from '../types';
-import { useChunkedUpload } from '../hooks/useChunkedUpload';
+import { useChunkedUpload, ChunkedUploadResult } from '../hooks/useChunkedUpload';
 import UploadProgressBar from './UploadProgressBar';
+import BookEditor from './BookEditor';
 
 interface UploadResult {
   fileName: string;
@@ -31,6 +32,8 @@ export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, own
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadResult, setUploadResult] = useState<ChunkedUploadResult | null>(null);
+  const [showEditor, setShowEditor] = useState(false);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -60,37 +63,44 @@ export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, own
 
     if (result.success) {
       setSuccess(true);
+      setUploadResult(result);
 
-      // 通知父组件 - 分片上传完成后，需要从服务器获取完整的数据
-      // 这里暂时使用文件名作为基本信息，实际数据会在后端处理完成后返回
-      const uploadResult: UploadResult = {
-        fileName: file.name,
-        fileFormat: file.type.split('/')[1] as 'pdf' | 'epub' | 'txt',
-        fileSize: file.size,
-        pageCount: 0, // 会在后端解析后更新
-        content: '', // 会在后端解析后更新
-        metadata: {
-          title: file.name.replace(/\.[^/.]+$/, ''),
-          subject: '',
-          category: '',
-          grade: '',
-          tags: [],
-          tableOfContents: []
-        }
-      };
-
-      onUploadSuccess(uploadResult);
-
-      // 重置表单
-      setTimeout(() => {
-        setSuccess(false);
-        setSelectedFile(null);
-        resetProgress();
-        event.target.value = '';
-      }, 2000);
+      // 如果有元数据，显示编辑器
+      if (result.metadata) {
+        setTimeout(() => {
+          setShowEditor(true);
+        }, 500);
+      }
     } else {
       setError(result.error || '上传失败，请重试');
     }
+  };
+
+  const handleSaveMetadata = (metadata: any) => {
+    if (!uploadResult || !selectedFile) return;
+
+    const finalResult: UploadResult = {
+      fileName: uploadResult.metadata?.fileName || selectedFile.name,
+      fileFormat: uploadResult.metadata?.fileFormat || 'pdf',
+      fileSize: uploadResult.metadata?.fileSize || selectedFile.size,
+      pageCount: uploadResult.metadata?.pageCount || 0,
+      content: '', // 内容不传给前端，只保存元数据
+      metadata: {
+        ...metadata,
+        tableOfContents: uploadResult.metadata?.tableOfContents || []
+      }
+    };
+
+    onUploadSuccess(finalResult);
+    setShowEditor(false);
+
+    // 重置表单
+    setTimeout(() => {
+      setSuccess(false);
+      setSelectedFile(null);
+      setUploadResult(null);
+      resetProgress();
+    }, 2000);
   };
 
   return (
@@ -137,10 +147,10 @@ export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, own
         )}
 
         {/* 成功提示 */}
-        {success && (
+        {success && !showEditor && (
           <div className="flex items-center gap-3 p-4 bg-green-50 rounded-lg border border-green-200">
             <CheckCircle className="w-5 h-5 text-green-600" />
-            <span className="text-sm text-green-800">上传成功！正在跳转到编辑页面...</span>
+            <span className="text-sm text-green-800">上传成功！AI 正在分析图书内容...</span>
           </div>
         )}
 
@@ -163,6 +173,15 @@ export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, own
           </ul>
         </div>
       </div>
+
+      {/* 图书信息编辑器 */}
+      {showEditor && uploadResult?.metadata && (
+        <BookEditor
+          metadata={uploadResult.metadata}
+          onSave={handleSaveMetadata}
+          onCancel={() => setShowEditor(false)}
+        />
+      )}
     </div>
   );
 };

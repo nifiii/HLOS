@@ -6,6 +6,7 @@ const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB
 export interface ChunkedUploadResult {
   success: boolean;
   filePath?: string;
+  metadata?: any;
   error?: string;
 }
 
@@ -109,6 +110,7 @@ export const useChunkedUpload = (): UseChunkedUploadReturn => {
       return {
         success: true,
         filePath: mergeResult.filePath,
+        metadata: mergeResult.metadata,
       };
 
     } catch (error: any) {

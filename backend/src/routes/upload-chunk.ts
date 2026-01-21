@@ -3,6 +3,9 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
+import { parsePDF } from '../services/pdfParser.js';
+import { parseEPUB } from '../services/epubParser.js';
+import { analyzeBookMetadata } from '../services/bookMetadataAnalyzer.js';
 
 const router = express.Router();
 
@@ -169,7 +172,62 @@ async function handleMerge(req: Request, res: Response): Promise<void> {
 
     console.log(`文件合并成功: ${safeFileName} -> ${relativePath}`);
 
-    res.json({ success: true, filePath: relativePath });
+    // 自动解析图书内容
+    console.log('开始解析图书内容...');
+    let parseResult;
+    const fileBuffer = await fs.readFile(finalPath);
+    const fileFormat = getFileFormat(safeFileName);
+
+    try {
+      switch (fileFormat) {
+        case 'pdf':
+          parseResult = await parsePDF(fileBuffer);
+          break;
+        case 'epub':
+          parseResult = await parseEPUB(fileBuffer);
+          break;
+        case 'txt':
+          parseResult = {
+            content: fileBuffer.toString('utf-8'),
+            pageCount: 1,
+            estimatedMetadata: {},
+            tableOfContents: [],
+          };
+          break;
+        default:
+          throw new Error(`不支持的文件格式: ${fileFormat}`);
+      }
+
+      // 使用 Gemini 分析元数据
+      console.log('开始 AI 元数据分析...');
+      const aiMetadata = await analyzeBookMetadata(
+        parseResult.content,
+        parseResult.tableOfContents,
+        safeFileName
+      );
+
+      console.log('AI 解析完成，返回元数据');
+      res.json({
+        success: true,
+        filePath: relativePath,
+        metadata: {
+          fileName: safeFileName,
+          fileFormat,
+          fileSize: fileBuffer.length,
+          pageCount: parseResult.pageCount,
+          ...aiMetadata,
+        }
+      });
+    } catch (error) {
+      console.error('图书解析失败:', error);
+      // 即使解析失败，也返回文件路径
+      res.json({
+        success: true,
+        filePath: relativePath,
+        metadata: null,
+        error: '图书解析失败，但文件已上传成功'
+      });
+    }
   } catch (error: any) {
     console.error('合并分片失败:', error);
 
@@ -184,6 +242,17 @@ async function handleMerge(req: Request, res: Response): Promise<void> {
 
     res.status(500).json({ success: false, error: error.message });
   }
+}
+
+/**
+ * 根据文件名获取文件格式
+ */
+function getFileFormat(fileName: string): 'pdf' | 'epub' | 'txt' {
+  const ext = path.extname(fileName).toLowerCase();
+  if (ext === '.pdf') return 'pdf';
+  if (ext === '.epub') return 'epub';
+  if (ext === '.txt') return 'txt';
+  return 'pdf'; // 默认
 }
 
 export default router;
