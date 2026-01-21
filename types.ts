@@ -25,8 +25,16 @@ export enum ProcessingStatus {
   SCANNING = 'scanning',
   PROCESSED = 'processed',
   ERROR = 'error',
-  INDEXING = 'indexing', 
+  INDEXING = 'indexing',
   ARCHIVED = 'archived'
+}
+
+export interface UploadProgress {
+  loaded: number;          // 已上传字节数
+  total: number;           // 文件总字节数
+  percentage: number;      // 上传进度百分比 (0-100)
+  chunkIndex: number;      // 当前分片索引 (从 0 开始)
+  totalChunks: number;     // 总分片数
 }
 
 export enum ProblemStatus {
@@ -101,12 +109,16 @@ export interface StructuredMetaData {
 
 export interface ScannedItem {
   id: string;
-  ownerId: string; 
+  ownerId: string;
   timestamp: number;
   imageUrl: string;
   rawMarkdown: string;
   meta: StructuredMetaData;
   status: ProcessingStatus;
+  parentExamId?: string;    // 父试卷 ID (用于多页试卷关联)
+  pageNumber?: number;      // 当前页码 (从 1 开始)
+  totalPages?: number;      // 总页数
+  multiPageSource?: boolean; // 是否来自多页试卷
 }
 
 export interface ExamRequest {
