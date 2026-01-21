@@ -58,15 +58,64 @@ export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, own
     setSuccess(false);
 
     console.log('📤 开始上传图书，端点: /api/upload-chunk');
-    // 使用分片上传
+    // 使用分���上传
     const result = await uploadFile(file, ownerId, '/api/upload-chunk');
 
-    if (result.success) {
+    if (result.success && result.filePath) {
       setSuccess(true);
       setUploadResult(result);
 
-      // 如果有元数据，显示编辑器
-      if (result.metadata) {
+      // 合并成功后，调用 upload-book 接口解析图书
+      console.log('✅ 分片上传完成，开始解析图书...');
+
+      try {
+        // 读取已上传的文件并调用解析接口
+        const parseResponse = await fetch('/api/upload-book', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            filePath: result.filePath,
+            fileName: file.name,
+            ownerId: ownerId
+          }),
+        });
+
+        if (parseResponse.ok) {
+          const parseData = await parseResponse.json();
+          console.log('✅ AI 解析成功:', parseData.data);
+
+          // 更新 uploadResult，包含解析后的元数据
+          setUploadResult({
+            ...result,
+            metadata: parseData.data.metadata
+          });
+
+          // 显示编辑器
+          setTimeout(() => {
+            setShowEditor(true);
+          }, 500);
+        } else {
+          throw new Error('解析失败');
+        }
+      } catch (error) {
+        console.error('❌ AI 解析失败，使用默认信息:', error);
+
+        // 解析失败时使用默认元数据
+        const defaultMetadata = {
+          title: file.name.replace(/\.(pdf|epub|txt)$/i, ''),
+          author: '',
+          subject: '',
+          category: '教材',
+          grade: '',
+          tags: []
+        };
+
+        setUploadResult({
+          ...result,
+          metadata: defaultMetadata
+        });
+
+        // 仍然显示编辑器，让用户手动填写
         setTimeout(() => {
           setShowEditor(true);
         }, 500);

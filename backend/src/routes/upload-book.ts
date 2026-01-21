@@ -1,5 +1,7 @@
 import express, { Request, Response } from 'express';
 import multer from 'multer';
+import path from 'path';
+import fs from 'fs/promises';
 import { parsePDF } from '../services/pdfParser.js';
 import { parseEPUB } from '../services/epubParser.js';
 import { analyzeBookMetadata } from '../services/bookMetadataAnalyzer.js';
@@ -109,6 +111,98 @@ router.post('/upload-book', upload.single('file'), async (req: Request, res: Res
 });
 
 /**
+ * POST /api/upload-book
+ * 通过文件路径解析已上传的图书
+ */
+router.post('/upload-book', async (req: Request, res: Response) => {
+  try {
+    const { filePath, fileName, ownerId } = req.body;
+
+    if (!filePath || !fileName) {
+      return res.status(400).json({
+        success: false,
+        error: '缺少必要参数',
+      });
+    }
+
+    // 安全检查：确保 filePath 在 uploads 目录内
+    const safePath = path.normalize(filePath);
+    const fullPath = path.join(process.cwd(), safePath);
+
+    if (!fullPath.startsWith(path.join(process.cwd(), 'uploads'))) {
+      return res.status(400).json({
+        success: false,
+        error: '非法的文件路径',
+      });
+    }
+
+    console.log(`开始解析已上传文件: ${fileName}`);
+
+    // 读取文件
+    const fileBuffer = await fs.readFile(fullPath);
+    const fileFormat = getFileFormatFromFileName(fileName);
+
+    let parseResult;
+
+    switch (fileFormat) {
+      case 'pdf':
+        parseResult = await parsePDF(fileBuffer);
+        break;
+      case 'epub':
+        parseResult = await parseEPUB(fileBuffer);
+        break;
+      case 'txt':
+        parseResult = {
+          content: fileBuffer.toString('utf-8'),
+          pageCount: 1,
+          estimatedMetadata: {},
+          tableOfContents: [],
+        };
+        break;
+      default:
+        return res.status(400).json({
+          success: false,
+          error: `不支持的文件格式: ${fileFormat}`
+        });
+    }
+
+    // 使用 Gemini 分析元数据
+    console.log('开始 AI 元数据分析...');
+    const aiMetadata = await analyzeBookMetadata(
+      parseResult.content,
+      parseResult.tableOfContents,
+      fileName
+    );
+
+    console.log('AI 解析完成');
+
+    // 返回解析结果和 AI 元数据
+    return res.json({
+      success: true,
+      data: {
+        fileName: fileName,
+        fileFormat,
+        fileSize: fileBuffer.length,
+        pageCount: parseResult.pageCount,
+        content: parseResult.content,
+        // 合并初步元数据和 AI 元数据
+        metadata: {
+          ...parseResult.estimatedMetadata,
+          ...aiMetadata,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('文件解析失败:', error);
+    const message = error instanceof Error ? error.message : '文件解析失败';
+    return res.status(500).json({
+      success: false,
+      error: message,
+    });
+  }
+});
+
+/**
  * 根据 MIME 类型获取文件格式
  */
 function getFileFormat(mimeType: string): 'pdf' | 'epub' | 'txt' {
@@ -120,6 +214,17 @@ function getFileFormat(mimeType: string): 'pdf' | 'epub' | 'txt' {
     return 'txt';
   }
   throw new Error(`未知的 MIME 类型: ${mimeType}`);
+}
+
+/**
+ * 根据文件名获取文件格式
+ */
+function getFileFormatFromFileName(fileName: string): 'pdf' | 'epub' | 'txt' {
+  const ext = path.extname(fileName).toLowerCase();
+  if (ext === '.pdf') return 'pdf';
+  if (ext === '.epub') return 'epub';
+  if (ext === '.txt') return 'txt';
+  return 'pdf'; // 默认
 }
 
 export default router;
