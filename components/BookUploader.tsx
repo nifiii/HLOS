@@ -55,7 +55,7 @@ export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, own
     setSuccess(false);
 
     // 使用分片上传
-    const result = await uploadFile(file, ownerId, '/api/upload-book');
+    const result = await uploadFile(file, ownerId, '/api/upload-chunk');
 
     if (result.success) {
       setSuccess(true);
