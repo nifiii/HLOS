@@ -9,6 +9,7 @@ import saveScannedItemRouter from './routes/saveScannedItem.js';
 import scannedItemsRouter from './routes/scannedItems.js';
 import saveBookRouter from './routes/saveBook.js';
 import booksRouter from './routes/books.js';
+import authRouter from './routes/auth.js';
 
 dotenv.config();
 
@@ -36,6 +37,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // 路由
+app.use('/api/auth', authRouter);
 app.use('/api', analyzeRouter);
 app.use('/api', coursewareRouter);
 app.use('/api', assessmentRouter);
