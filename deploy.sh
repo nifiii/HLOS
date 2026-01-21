@@ -305,6 +305,18 @@ server {
         root /opt/hl-os/frontend;
         try_files $uri $uri/ /index.html;
         index index.html;
+
+        # 禁用静态文件缓存，确保更新立即生效
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        add_header Pragma "no-cache";
+        add_header Expires "0";
+    }
+
+    # JS/CSS 文件使用内容哈希，可以长期缓存
+    location ~* \.(js|css)$ {
+        root /opt/hl-os/frontend;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
     }
 
     # 后端 API 代理
