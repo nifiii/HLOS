@@ -401,6 +401,23 @@ home-learning-os/
 
 ## 🔒 安全性说明
 
+### 访问控制
+
+**推荐方案**: Nginx Basic Auth（家庭单密码）
+
+- ✅ **简单可靠**: Nginx内置功能，无需额外开发
+- ✅ **家庭友好**: 单一密码，全家人共享
+- ✅ **信任平等**: 无角色区分，信息透明
+- ✅ **HTTPS支持**: 可配合SSL证书加密传输
+
+**快速配置**:
+1. 安装工具: `sudo apt-get install apache2-utils`
+2. 创建密码: `sudo htpasswd -c /etc/nginx/auth/.htpasswd family`
+3. 配置Nginx: 参考 `docs/NGINX_BASIC_AUTH.md`
+4. 重启服务: `sudo systemctl restart nginx`
+
+**详细文档**: [Nginx Basic Auth 配置指南](docs/NGINX_BASIC_AUTH.md)
+
 ### API Key 保护
 
 - ✅ **后端**: API Key 存储在服务器环境变量,前端无法访问
