@@ -15,6 +15,7 @@ RUN npm config set registry https://registry.npmmirror.com && \
 # 复制前端源代码
 COPY components ./components
 COPY services ./services
+COPY hooks ./hooks
 COPY src ./src
 COPY types.ts ./
 COPY App.tsx ./
