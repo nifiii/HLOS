@@ -220,12 +220,31 @@ async function handleMerge(req: Request, res: Response): Promise<void> {
       });
     } catch (error) {
       console.error('图书解析失败:', error);
-      // 即使解析失败，也返回文件路径
+
+      // 解析失败时，使用文件名生成默认元数据
+      const defaultMetadata = {
+        title: safeFileName.replace(/\.(pdf|epub|txt)$/i, ''),
+        author: '',
+        subject: '',
+        category: '教材',
+        grade: '',
+        tags: []
+      };
+
+      console.log('返回默认元数据:', defaultMetadata);
+
+      // 即使解析失败，也返回文件路径和默认元数据
       res.json({
         success: true,
         filePath: relativePath,
-        metadata: null,
-        error: '图书解析失败，但文件已上传成功'
+        metadata: {
+          fileName: safeFileName,
+          fileFormat,
+          fileSize: fileBuffer.length,
+          pageCount: 0,
+          ...defaultMetadata
+        },
+        parseError: '图书解析失败，已使用默认信息'
       });
     }
   } catch (error: any) {
