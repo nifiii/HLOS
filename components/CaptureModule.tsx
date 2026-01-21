@@ -1,5 +1,5 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import { analyzeImage } from '../services/geminiService';
 import { saveScannedItemToServer } from '../services/apiService';
@@ -17,14 +17,47 @@ const CaptureModule: React.FC<CaptureModuleProps> = ({ onScanComplete, currentUs
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [processingError, setProcessingError] = useState<string | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [reviewItem, setReviewItem] = useState<ScannedItem | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // 多页试卷管理
+  const [pendingImages, setPendingImages] = useState<string[]>([]); // 待处理图片队列
+  const [currentProcessingIndex, setCurrentProcessingIndex] = useState<number>(0); // 当前处理的图片索引
+  const [isProcessingBatch, setIsProcessingBatch] = useState(false); // 是否正在批量处理
+  const parentExamIdRef = useRef<string | null>(null); // 批量处理时的统一父试卷ID
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    // 支持多选
+    if (files.length > 1) {
+      // 多图模式：添加到待处理队列
+      // 生成统一的 parentExamId（所有页共享同一个ID）
+      parentExamIdRef.current = Date.now().toString();
+
+      const loadImagePromises = Array.from(files).map((file) => {
+        return new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            resolve(e.target?.result as string);
+          };
+          reader.readAsDataURL(file);
+        });
+      });
+
+      // 使用 Promise.all 确保图片按顺序加载
+      Promise.all(loadImagePromises).then((imageUrls) => {
+        setPendingImages(imageUrls);
+        setIsProcessingBatch(true);
+        setCurrentProcessingIndex(0);
+      });
+    } else {
+      // 单图模式：原有逻辑
+      const file = files[0];
       const reader = new FileReader();
       reader.onloadend = () => {
         setPreview(reader.result as string);
@@ -34,9 +67,94 @@ const CaptureModule: React.FC<CaptureModuleProps> = ({ onScanComplete, currentUs
     }
   };
 
+  // 串行处理多张图片
+  useEffect(() => {
+    let mounted = true;
+
+    if (pendingImages.length === 0 || !isProcessingBatch) return;
+
+    const processSerially = async () => {
+      const currentImage = pendingImages[currentProcessingIndex];
+
+      setIsProcessing(true);
+
+      try {
+        const result = await analyzeImage(currentImage);
+
+        // 使用 ref 中存储的统一 parentExamId（所有页共享同一个ID）
+        const parentExamId = parentExamIdRef.current;
+
+        const newItem: ScannedItem = {
+          id: `${Date.now()}-${currentProcessingIndex}`,
+          ownerId: currentUser.id,
+          timestamp: Date.now(),
+          imageUrl: currentImage,
+          rawMarkdown: result.text,
+          meta: result.meta,
+          status: ProcessingStatus.PROCESSED,
+          // 多页试卷关联
+          parentExamId: parentExamId || undefined,
+          pageNumber: pendingImages.length > 1 ? currentProcessingIndex + 1 : undefined,
+          totalPages: pendingImages.length > 1 ? pendingImages.length : undefined,
+          multiPageSource: pendingImages.length > 1,
+        };
+
+        // 检查组件是否仍然挂载
+        if (!mounted) return;
+
+        onScanComplete(newItem);
+
+        // 触发成功动画
+        confetti({
+          particleCount: 50,
+          spread: 60,
+          origin: { y: 0.7 },
+          colors: ['#4A90E2', '#5FD4A0', '#FFB84D']
+        });
+
+        // 处理下一张或完成
+        if (currentProcessingIndex < pendingImages.length - 1) {
+          setCurrentProcessingIndex(currentProcessingIndex + 1);
+        } else {
+          // 全部完成，重置状态
+          setPendingImages([]);
+          setIsProcessingBatch(false);
+          setCurrentProcessingIndex(0);
+          setPreview(null);
+          // 清理 parentExamId
+          parentExamIdRef.current = null;
+        }
+
+      } catch (error: any) {
+        if (!mounted) return;
+
+        // 触发错误提示（使用 toast，移除 alert）
+        const errorMsg = `第 ${currentProcessingIndex + 1} 张图片识别失败: ${error.message || '未知错误'}`;
+        console.error(errorMsg, error);
+
+        // 重置状态
+        setIsProcessingBatch(false);
+        setPendingImages([]);
+        setCurrentProcessingIndex(0);
+        parentExamIdRef.current = null;
+      } finally {
+        if (mounted) {
+          setIsProcessing(false);
+        }
+      }
+    };
+
+    void processSerially();
+
+    return () => {
+      mounted = false;
+    };
+  }, [pendingImages, currentProcessingIndex, isProcessingBatch, currentUser, onScanComplete]);
+
   const handleProcess = async () => {
     if (!preview) return;
     setIsProcessing(true);
+    setProcessingError(null);
     try {
       const result = await analyzeImage(preview);
       const newItem: ScannedItem = {
@@ -50,7 +168,7 @@ const CaptureModule: React.FC<CaptureModuleProps> = ({ onScanComplete, currentUs
       };
       setReviewItem(newItem);
     } catch (error: any) {
-      alert(error.message || "AI 语义解构失败，请重试。");
+      setProcessingError(error.message || "AI 语义解构失败，请重试。");
     } finally {
       setIsProcessing(false);
     }
@@ -284,11 +402,17 @@ const CaptureModule: React.FC<CaptureModuleProps> = ({ onScanComplete, currentUs
             id="file-input"
             type="file"
             accept="image/*"
+            multiple
             capture="environment"
             className="hidden"
             ref={fileInputRef}
             onChange={handleFileChange}
           />
+
+          {/* 多图上传提示 */}
+          <div className="text-xs text-slate-500 mt-4 text-center">
+            支持多张图片上传，将自动按顺序识别并合并为多页试卷
+          </div>
         </motion.div>
       ) : preview && !isProcessing ? (
         <Card className="space-y-6">
@@ -301,6 +425,14 @@ const CaptureModule: React.FC<CaptureModuleProps> = ({ onScanComplete, currentUs
               <i className="fa-solid fa-xmark"></i>
             </button>
           </div>
+
+          {/* 显示处理错误 */}
+          {processingError && (
+            <div className="bg-red-50 text-red-600 px-4 py-3 rounded-xl border border-red-200 text-sm">
+              {processingError}
+            </div>
+          )}
+
           <Button
             variant="primary"
             size="lg"
@@ -317,20 +449,43 @@ const CaptureModule: React.FC<CaptureModuleProps> = ({ onScanComplete, currentUs
           animate={{ opacity: 1 }}
           className="flex flex-col items-center justify-center min-h-[60vh]"
         >
-          <LoadingSpinner size={48} text="AI 正在识别中..." />
+          <LoadingSpinner
+            size={48}
+            text={isProcessingBatch ? `正在识别第 ${currentProcessingIndex + 1} / ${pendingImages.length} 张...` : "AI 正在识别中..."}
+          />
           <p className="text-sm text-gray-500 mt-4">识别速度受网络影响</p>
 
-          {/* 进度提示 */}
-          <div className="mt-8 w-64">
-            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-              <motion.div
-                className="h-full bg-gradient-to-r from-sky-400 to-mint-400"
-                initial={{ width: 0 }}
-                animate={{ width: '100%' }}
-                transition={{ duration: 3, ease: 'easeInOut' }}
-              />
+          {/* 批量处理进度提示 */}
+          {isProcessingBatch && pendingImages.length > 1 && (
+            <div className="mt-6 w-80">
+              <div className="flex justify-between text-xs text-gray-600 mb-2">
+                <span>批量处理进度</span>
+                <span>{currentProcessingIndex + 1} / {pendingImages.length}</span>
+              </div>
+              <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full bg-gradient-to-r from-sky-400 to-mint-400"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${((currentProcessingIndex + 1) / pendingImages.length) * 100}%` }}
+                  transition={{ duration: 0.5 }}
+                />
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* 单图处理进度提示 */}
+          {!isProcessingBatch && (
+            <div className="mt-8 w-64">
+              <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full bg-gradient-to-r from-sky-400 to-mint-400"
+                  initial={{ width: 0 }}
+                  animate={{ width: '100%' }}
+                  transition={{ duration: 3, ease: 'easeInOut' }}
+                />
+              </div>
+            </div>
+          )}
         </motion.div>
       ) : null}
     </div>
