@@ -1,8 +1,8 @@
 # 智学 OS (Home-Learning-OS) 项目架构与功能描述
 
 **生成时间**: 2026-01-20
-**最后更新**: 2026-01-20
-**项目版本**: v1.1.0 (服务端存储架构)
+**最后更新**: 2026-01-21
+**项目版本**: v1.2.0 (分片上传与多页试卷支持)
 **文档用途**: 为功能优化和UI调试提供全面的技术参考
 
 ---
@@ -249,14 +249,48 @@ App.tsx
 
 ### 3.3 CaptureModule (拍题录入)
 
-**文件**: `components/CaptureModule.tsx`
+**文件**: `components/CaptureModule.tsx`, `hooks/useChunkedUpload.ts`, `components/UploadProgressBar.tsx`
 
 **功能描述**:
 - 相机拍摄 (移动端)
 - 图片上传 (桌面端)
+- **✅ 多图片上传**: 一次选择多张图片，支持多页试卷
+- **✅ 串行OCR处理**: 逐张处理，确保质量和稳定性
+- **✅ 智能进度显示**: 实时显示当前处理进度（第X/共Y张）
 - AI图像分析 (4层OCR解构)
 - 结果审核与修正
 - 批量归档
+
+**多页试卷关联**:
+```typescript
+interface ScannedItem {
+  // ... 其他字段
+  parentExamId?: string;    // 父试卷ID（多页共享）
+  pageNumber?: number;      // 当前页码（从1开始）
+  totalPages?: number;      // 总页数
+  multiPageSource?: boolean; // 是否来自多页试卷
+}
+```
+
+**分片上传Hook** (`useChunkedUpload.ts`):
+```typescript
+const {
+  uploadProgress,  // { loaded, total, percentage, chunkIndex, totalChunks }
+  isUploading,
+  uploadFile,
+  resetProgress
+} = useChunkedUpload();
+
+// 使用示例
+const result = await uploadFile(file, ownerId, '/api/upload-book');
+```
+
+**上传进度条组件** (`UploadProgressBar.tsx`):
+- 显示文件名和上传图标
+- 实时进度百分比（大号显示）
+- 字节进度（已上传/总字节数）
+- 分片状态（第X片/共Y片）
+- 上传中/完成状态提示
 
 **4层OCR解构协议**:
 ```markdown
@@ -906,6 +940,23 @@ interface ScannedItem {
   meta: StructuredMetaData;            // 结构化元数据
   status: ProcessingStatus;            // 处理状态
   anythingLlmIndexed?: boolean;        // 是否已索引到RAG
+
+  // 多页试卷关联字段 (2026-01-21新增)
+  parentExamId?: string;               // 父试卷ID（多页共享）
+  pageNumber?: number;                 // 当前页码（从1开始）
+  totalPages?: number;                 // 总页数
+  multiPageSource?: boolean;           // 是否来自多页试卷
+}
+```
+
+#### UploadProgress (上传进度)
+```typescript
+interface UploadProgress {
+  loaded: number;                     // 已上传字节数
+  total: number;                       // 文件总字节数
+  percentage: number;                  // 上传进度百分比 (0-100)
+  chunkIndex: number;                  // 当前分片索引 (从0开始)
+  totalChunks: number;                 // 总分片数
 }
 ```
 
@@ -1037,7 +1088,57 @@ enum ProblemStatus {
 
 ### 6.2 核心API端点
 
-#### 1. POST /api/analyze-image (图像分析)
+#### 1. POST /api/upload-chunk (分片上传) ⭐NEW
+
+**请求** (multipart/form-data):
+```
+chunk: <分片文件数据>
+chunkIndex: 0                           // 当前分片索引
+totalChunks: 10                          // 总分片数
+fileId: "timestamp-filename"            // 上传会话ID
+fileName: "large-book.pdf"               // 原始文件名
+ownerId: "child_1"                       // 所有者ID
+```
+
+**响应**:
+```json
+{
+  "success": true
+}
+```
+
+**重试机制**:
+- 指数退避：1秒 → 2秒 → 3秒
+- 最多重试3次
+- 自动跳过已上传分片
+
+#### 2. POST /api/upload-chunk?action=merge (合并分片) ⭐NEW
+
+**请求** (application/json):
+```json
+{
+  "fileId": "timestamp-filename",
+  "fileName": "large-book.pdf",
+  "ownerId": "child_1"
+}
+```
+
+**响应**:
+```json
+{
+  "success": true,
+  "filePath": "/uploads/files/uuid.pdf"
+}
+```
+
+**安全特性**:
+- fileId 格式验证（防止路径遍历）
+- fileName 净化处理（`path.basename()`）
+- 分片索引范围检查（0 ≤ index < totalChunks）
+- 分片总数上限（10,000片）
+- 文件大小限制（10MB/片）
+
+#### 3. POST /api/analyze-image (图像分析)
 
 **请求**:
 ```json
@@ -1166,7 +1267,7 @@ ownerId: 'child_1'
 - 最大文件大小: 100MB
 - 支持格式: PDF, EPUB, TXT
 
-#### 5. POST /api/anythingllm/index-book (RAG索引)
+#### 6. POST /api/anythingllm/index-book (RAG索引)
 
 **请求**:
 ```json
@@ -1591,22 +1692,27 @@ curl https://hl-os.example.com/api/health
 3. ⚠️ **图片未压缩**: base64存储占用大量内存
 
 **优化方案**:
-1. ✅ **分片上传** (Chunked Upload)
-   - 使用 `tus-js-client` 库
-   - 断点续传支持
+1. ✅ **分片上传** (Chunked Upload) - 已完成 (2026-01-21)
+   - 自定义实现（非tus协议）
+   - 5MB分片，支持大文件
+   - 指数退避重试（1s, 2s, 3s）
+   - 实时进度显示
 
-2. ✅ **代码分割**
+2. ⏳ **代码分割**
    ```typescript
    const LiveTutor = React.lazy(() => import('./components/LiveTutor'));
    ```
 
-3. ✅ **图片压缩**
-   - 前端使用 `browser-image-compression`
-   - 后端使用 `sharp` 库
+3. ❌ **图片压缩** - 已决定不实施（保持OCR精度）
 
 4. ✅ **虚拟滚动**
    - KnowledgeHub 使用 `react-window`
    - 提升大列表渲染性能
+
+5. ✅ **临时文件自动清理** - 已完成 (2026-01-21)
+   - 定时清理：每小时运行
+   - 保留期：24小时
+   - 统计释放空间
 
 ### 9.3 UI/UX层面
 
@@ -1711,16 +1817,20 @@ HL-os/
 ├── components/
 │   ├── Dashboard.tsx            # 概览面板
 │   ├── LibraryHub.tsx           # 图书馆
-│   ├── CaptureModule.tsx        # 拍题录入
+│   ├── CaptureModule.tsx        # 拍题录入（多图片上传）
 │   ├── StudyRoom.tsx            # AI学习园地
 │   ├── KnowledgeHub.tsx         # 档案库
 │   ├── ExamCenter.tsx           # 考试中心
 │   ├── LiveTutor.tsx            # AI实时辅导
+│   ├── UploadProgressBar.tsx   # 上传进度条 ⭐NEW
 │   └── ui/                      # UI组件库
 │       ├── Button.tsx
 │       ├── Card.tsx
 │       ├── Badge.tsx
 │       └── LoadingSpinner.tsx
+├── hooks/                       # React Hooks ⭐NEW
+│   ├── useDashboardStats.ts    # 统计数据Hook
+│   └── useChunkedUpload.ts     # 分片上传Hook
 │
 ├── backend/
 │   ├── src/
@@ -1730,7 +1840,10 @@ HL-os/
 │   │   │   ├── courseware.ts    # /api/generate-courseware
 │   │   │   ├── assessment.ts    # /api/generate-assessment
 │   │   │   ├── upload-book.ts   # /api/upload-book
+│   │   │   ├── upload-chunk.ts  # /api/upload-chunk ⭐NEW
 │   │   │   └── anythingllm.ts   # /api/anythingllm/*
+│   │   └── utils/
+│   │       ├── cleanup.ts       # 临时文件清理 ⭐NEW
 │   │   └── services/
 │   │       ├── geminiService.ts          # Gemini API封装
 │   │       ├── bookMetadataAnalyzer.ts   # 元数据提取
@@ -1767,4 +1880,4 @@ HL-os/
 
 ---
 
-*本文档最后更新: 2026-01-20*
+*本文档最后更新: 2026-01-21*

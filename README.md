@@ -31,6 +31,9 @@
   - 高精度 OCR：完美还原数学公式 (LaTeX)、保留原文排版
   - 结构化提取：自动提取学科、章节线索、知识点、标签
   - 四层提取协议：原始内容 → 红笔批注 → 学生行为 → 订正闭环
+  - **✅ 多图片上传**: 支持一次选择多张图片，自动识别为多页试卷
+  - **✅ 串行处理**: 逐张进行 OCR 分析，确保质量和稳定性
+  - **✅ 智能关联**: 多页试卷通过 `parentExamId` 自动关联，支持按页码排序
 
 ### 3. 📚 图书馆模块 (Library Hub)
 - **电子书管理**:
@@ -38,6 +41,8 @@
   - AI 自动提取元数据：书名、作者、学科、类别、年级、标签
   - 智能识别章节目录结构（三级目录树）
   - 用户可手动编辑所有元数据
+  - **✅ 分片上传**: 大文件自动分片上传（5MB/片），带进度显示和断点续传
+  - **✅ 智能重试**: 上传失败自动重试（指数退避：1s, 2s, 3s）
 - **智能索引**:
   - 自动向量化图书内容到 AnythingLLM
   - 支持语义搜索和 RAG 检索
@@ -128,10 +133,12 @@
 #### 后端
 - **运行时**: Node.js 20 + Express
 - **AI SDK**: Google GenAI (`@google/genai`)
-- **文件解析**:
+- **文件处理**:
   - `pdf-parse` - PDF 解析
   - `epub2` - EPUB 解析
-  - `multer` - 文件上传
+  - `multer` - 文件上传（内存存储，10MB限制）
+  - **✅ 分片上传**: 自定义实现，5MB分片，自动合并
+- **文件清理**: 定时清理过期临时文件（24小时保留期）
 - **日志**: Winston
 
 #### 数据存储架构（三层存储）
@@ -378,10 +385,10 @@ home-learning-os/
 │   │       └── epubParser.ts
 │   ├── package.json
 │   └── tsconfig.json
-├── components/               # React 组件 (15个)
+├── components/               # React 组件 (16个)
 │   ├── Layout.tsx            # 布局框架
 │   ├── Dashboard.tsx         # 数据看板
-│   ├── CaptureModule.tsx     # 拍题模块
+│   ├── CaptureModule.tsx     # 拍题模块（多图片上传）
 │   ├── KnowledgeHub.tsx      # 知识库
 │   ├── ExamCenter.tsx        # 考场
 │   ├── LibraryHub.tsx        # 图书馆
@@ -389,17 +396,21 @@ home-learning-os/
 │   ├── LiveTutor.tsx         # 实时语音辅导
 │   ├── UserSwitcher.tsx      # 用户切换器（快速切换按钮）
 │   ├── BookCard.tsx          # 图书卡片
-│   ├── BookUploader.tsx      # 图书上传器
+│   ├── BookUploader.tsx      # 图书上传器（分片上传）
 │   ├── BookMetadataEditor.tsx# 元数据编辑器
 │   ├── ChapterSelector.tsx   # 章节选择器
 │   ├── CoursewareGenerator.tsx# 课件生成器
-│   └── QuizGenerator.tsx     # 测验生成器
+│   ├── QuizGenerator.tsx     # 测验生成器
+│   └── UploadProgressBar.tsx # 上传进度条组件
+├── hooks/                    # React Hooks
+│   ├── useDashboardStats.ts  # 统计数据Hook
+│   └── useChunkedUpload.ts   # 分片上传Hook ⭐NEW
 ├── services/                 # 前端服务层
 │   ├── geminiService.ts      # Gemini API 客户端
 │   ├── ragSearchService.ts   # RAG 搜索服务
 │   ├── bookStorage.ts        # IndexedDB 图书存储
 │   └── audioUtils.ts         # 语音工具
-├── types.ts                  # TypeScript 类型定义
+├── types.ts                  # TypeScript 类型定义（含分片上传类型）
 ├── App.tsx                   # 应用根组件
 ├── index.tsx                 # 入口文件
 ├── index.html                # HTML 模板
@@ -538,10 +549,16 @@ npm run build
     - 移除前端 PIN 认证
     - 采用 Nginx Basic Auth
     - 信任平等设计理念
+  - **分片上传功能** (2026-01-21)
+    - 5MB分片上传，支持大文件
+    - 指数退避重试机制
+    - 实时进度显示
+    - 多图片串行OCR处理
+    - 临时文件自动清理
 
 - [x] 阶段 2: 核心功能 (✅ 已完成)
-  - 智能拍题 OCR
-  - 图书馆模块
+  - 智能拍题 OCR（支持多页试卷）
+  - 图书馆模块（分片上传）
   - AI 学习园地
   - 智能考场
 
