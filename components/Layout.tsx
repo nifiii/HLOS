@@ -1,6 +1,7 @@
 import React from 'react';
 import { UserProfile } from '../types';
 import { Home, Camera, BookOpen, Library, GraduationCap, FileText, Mic, LucideIcon } from 'lucide-react';
+import UserSwitcher from './UserSwitcher';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -61,18 +62,11 @@ const Layout: React.FC<LayoutProps> = ({
 
           {/* 右侧：用户切换 */}
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => {
-                const nextIndex = (availableUsers.findIndex(u => u.id === currentUser.id) + 1) % availableUsers.length;
-                onSwitchUser(availableUsers[nextIndex].id);
-              }}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors cursor-pointer"
-            >
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-sky-400 to-mint-400 flex items-center justify-center text-white font-medium text-sm">
-                {currentUser.name[0]}
-              </div>
-              <span className="font-medium text-gray-700 hidden sm:block">{currentUser.name}</span>
-            </button>
+            <UserSwitcher
+              currentUser={currentUser}
+              availableUsers={availableUsers}
+              onUserSwitch={onSwitchUser}
+            />
           </div>
         </div>
       </header>

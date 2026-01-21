@@ -17,6 +17,27 @@ const FAMILY_PROFILES: UserProfile[] = [
   { id: 'child_2', name: '二宝', avatar: '👧', grade: '初中一年级' }
 ];
 
+// LocalStorage 键名
+const LAST_USED_USER_KEY = 'lastUsedUserId';
+
+// LocalStorage 辅助函数（带错误处理）
+const saveLastUsedUser = (userId: string) => {
+  try {
+    localStorage.setItem(LAST_USED_USER_KEY, userId);
+  } catch (error) {
+    console.warn('无法保存用户选择到 localStorage:', error);
+  }
+};
+
+const getLastUsedUser = (): string | null => {
+  try {
+    return localStorage.getItem(LAST_USED_USER_KEY);
+  } catch (error) {
+    console.warn('无法从 localStorage 读取用户选择:', error);
+    return null;
+  }
+};
+
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [currentUser, setCurrentUser] = useState<UserProfile>(FAMILY_PROFILES[0]);
@@ -24,6 +45,26 @@ const App: React.FC = () => {
   const [books, setBooks] = useState<EBook[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showTutor, setShowTutor] = useState(false);
+  const [switchToast, setSwitchToast] = useState<string | null>(null);
+
+  // 初始化：加载上次使用的用户
+  useEffect(() => {
+    const lastUserId = getLastUsedUser();
+    if (lastUserId) {
+      const user = FAMILY_PROFILES.find(u => u.id === lastUserId);
+      if (user) {
+        setCurrentUser(user);
+      }
+    }
+  }, []);
+
+  // 自动清除切换提示 Toast
+  useEffect(() => {
+    if (switchToast) {
+      const timer = setTimeout(() => setSwitchToast(null), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [switchToast]);
 
   // 加载图书数据（从服务器）
   useEffect(() => {
@@ -113,7 +154,11 @@ const App: React.FC = () => {
 
   const handleUserSwitch = (userId: string) => {
     const user = FAMILY_PROFILES.find(u => u.id === userId);
-    if (user) setCurrentUser(user);
+    if (user) {
+      setCurrentUser(user);
+      saveLastUsedUser(userId);
+      setSwitchToast(`✅ 已切换到${user.name}的视图`);
+    }
   };
 
   // 全局错误提示 UI
@@ -125,6 +170,19 @@ const App: React.FC = () => {
         <i className="fa-solid fa-xmark"></i>
       </button>
     </div>
+  ) : null;
+
+  // 用户切换提示 Toast
+  const SwitchToast = () => switchToast ? (
+    <motion.div
+      initial={{ y: -100, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.3 }}
+      className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] bg-gradient-to-r from-sky-400 to-mint-400 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-2"
+    >
+      <span className="text-sm font-bold">{switchToast}</span>
+    </motion.div>
   ) : null;
 
   // 页面切换动画配置
@@ -191,6 +249,7 @@ const App: React.FC = () => {
       onSwitchUser={handleUserSwitch}
     >
       <ErrorToast />
+      <SwitchToast />
       <AnimatePresence mode="wait">
         <motion.div
           key={activeTab}
