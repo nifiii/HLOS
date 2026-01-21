@@ -163,10 +163,11 @@ router.post('/upload-book/parse', async (req: Request, res: Response) => {
 
     console.log(`开始解析已上传文件: ${fileName}`);
     console.log(`文件路径: ${fullPath}`);
-    console.log(`文件大小: ${fileBuffer.length} bytes`);
 
     // 读取文件
     const fileBuffer = await fs.readFile(fullPath);
+    console.log(`文件大小: ${fileBuffer.length} bytes`);
+
     const fileFormat = getFileFormatFromFileName(fileName);
 
     console.log(`文件格式: ${fileFormat}`);
