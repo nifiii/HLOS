@@ -39,3 +39,6 @@ ssl/
 *.njsproj
 *.sln
 *.sw?
+
+# Git worktrees
+.worktrees/
