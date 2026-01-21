@@ -1,7 +1,8 @@
 # 服务端数据持久化 - 测试与部署指南
 
 **日期**: 2026-01-20
-**状态**: 前端集成完成，待测试验证
+**最后更新**: 2026-01-21
+**状态**: 已完成，包含分片上传功能
 
 ---
 
@@ -13,6 +14,9 @@
 - ✅ Obsidian 格式 Markdown 自动生成
 - ✅ AnythingLLM 向量数据库自动索引
 - ✅ 前端从服务器加载数据（移除 IndexedDB）
+- ✅ **分片上传**：支持大文件上传（5MB分片），带进度显示和重试机制
+- ✅ **多图片上传**：支持多页试卷，串行OCR处理
+- ✅ **临时文件清理**：自动清理24小时前的过期分片文件
 
 ---
 
@@ -48,9 +52,11 @@ sudo chown -R www-data:www-data /opt/hl-os
 ```yaml
 backend:
   volumes:
-    - ./data:/opt/hl-os/data  # 添加这行
+    - ./data:/opt/hl-os/data  # 数据持久化
+    - ./uploads:/app/uploads  # 分片上传目录 ⭐NEW
   environment:
     - DATA_DIR=/opt/hl-os/data
+    - UPLOAD_DIR=/app/uploads  # 分片上传目录 ⭐NEW
 ```
 
 ### 2.4 拉取最新代码
@@ -141,19 +147,39 @@ cat /opt/hl-os/data/metadata.json | jq '.[] | select(.type=="wrong_problem")' | 
 - Markdown 文件保存在 `/opt/hl-os/data/obsidian/Wrong_Problems/大宝/数学/YYYY-MM-DD_主题_uuid.md`
 - `metadata.json` 包含该扫描项的元数据
 
-### 4.2 教材上传测试
+### 4.2 教材上传测试（含分片上传）
 
 **测试步骤**：
 1. 进入"图书馆"模块
 2. 点击"上传教材"
-3. 选择一个 PDF 文件（< 100MB）
+3. 选择一个较大的 PDF 文件（10-50MB，测试分片功能）
 4. 点击"开始上传"
 
 **验证点**：
-- ✅ 上传进度显示
-- ✅ AI 元数据分析成功
-- ✅ 元数据编辑界面显示
-- ✅ 保存后图书出现在列表中
+- ✅ **分片上传进度条**：显示当前分片（第X/共Y片）
+- ✅ **字节进度**：已上传/总字节数显示
+- ✅ **AI 元数据分析成功**
+- ✅ **元数据编辑界面显示**
+- ✅ **保存后图书出现在列表中**
+
+**服务端验证**：
+```bash
+# 检查文件是否创建
+ls -lh /opt/hl-os/data/uploads/files/
+
+# 检查临时分片目录是否已清理（上传1小时后）
+ls -lh /opt/hl-os/data/uploads/temp/ || echo "临时目录已清理（预期行为）"
+
+# 检查元数据
+cat /opt/hl-os/data/metadata.json | jq '.[] | select(.type=="textbook")'
+```
+
+**分片上传功能特性**：
+- **自动分片**：文件 > 5MB 自动分片上传
+- **进度显示**：实时显示分片索引和总字节数
+- **智能重试**：上传失败自动重试（1s, 2s, 3s）
+- **自动合并**：所有分片上传完成后自动合并
+- **临时清理**：24小时后自动清理过期分片文件
 
 **服务端验证**：
 ```bash
@@ -164,17 +190,35 @@ ls -lh /opt/hl-os/data/originals/books/$(date +%Y-%m)/
 cat /opt/hl-os/data/metadata.json | jq '.[] | select(.type=="textbook")'
 ```
 
-### 4.3 数据加载测试
+### 4.3 多图片上传测试（多页试卷）
 
 **测试步骤**：
-1. 刷新浏览器页面（Ctrl+F5）
-2. 进入"档案库"模块
-3. 检查之前保存的扫描项是否显示
+1. 进入"拍题录入"模块
+2. 点击上传区域，选择多张图片（Shift/Ctrl 多选）
+3. 点击"开始分析"
 
 **验证点**：
-- ✅ 数据自动从服务器加载
-- ✅ 无需重新登录
-- ✅ 数据在多设备间同步（测试另一台设备）
+- ✅ **多图选择**：可以一次选择多张图片
+- ✅ **串行处理提示**：显示"正在识别第 X / Y 张"
+- ✅ **逐张完成动画**：每张图片处理完成后触发庆祝动画
+- ✅ **自动关联**：多张图片通过 `parentExamId` 关联
+- ✅ **页码编号**：`pageNumber` 从1开始，`totalPages` 显示总页数
+
+**服务端验证**：
+```bash
+# 检查同一试卷的所有页码
+cat /opt/hl-os/data/metadata.json | jq '.[] | select(.parentExamId=="xxx") | {pageNumber, totalPages}
+
+# 预期输出：
+# {"pageNumber": 1, "totalPages": 5, ...}
+# {"pageNumber": 2, "totalPages": 5, ...}
+# ...
+```
+
+**OCR处理质量**：
+- 每张图片独立进行 OCR 分析
+- 串行处理确保稳定性（避免 API 并发限制）
+- 每页生成独立的 `ScannedItem`，但共享 `parentExamId`
 
 ### 4.4 AnythingLLM 索引测试
 
@@ -213,15 +257,59 @@ docker-compose restart backend
 docker-compose logs backend | tail -50
 ```
 
-### 5.2 文件未创建
+### 5.2 分片上传失败
 
-**原因**：目录权限问题
+**症状**：大文件上传卡住或失败
+
+**排查步骤**：
+```bash
+# 检查后端日志
+docker-compose logs backend | grep -i "upload"
+
+# 检查磁盘空间
+df -h /opt/hl-os/data/uploads
+
+# 检查临时目录
+ls -lh /opt/hl-os/data/uploads/temp/
+```
+
+**常见原因**：
+- 磁盘空间不足（清理临时文件）
+- 分片索引超出范围
+- 文件名包含非法字符
 
 **解决**：
 ```bash
-# 修正权限
-sudo chown -R www-data:www-data /opt/hl-os/data
-sudo chmod -R 755 /opt/hl-os/data
+# 手动清理临时文件
+rm -rf /opt/hl-os/data/uploads/temp/*
+
+# 检查 cleanup 工具是否运行
+docker-compose logs backend | grep -i "cleanup"
+
+# 手动触发清理（如需要）
+docker-compose exec backend node -e "require('./src/utils/cleanup.ts').then(c => c.cleanupTempChunks())"
+```
+
+### 5.3 临时文件占用过多空间
+
+**症状**：`/opt/hl-os/data/uploads/temp/` 占用大量空间
+
+**说明**：这是正常的，临时文件会在24小时后自动清理。
+
+**手动清理**：
+```bash
+# 删除所有临时分片
+rm -rf /opt/hl-os/data/uploads/temp/*
+
+# 重启后端服务（确保清理任务仍在运行）
+docker-compose restart backend
+```
+
+**验证清理任务**：
+```bash
+# 查看最近的清理日志
+docker-compose logs backend | grep -i "清理"
+# 预期：每小时看到清理日志
 ```
 
 ### 5.3 AnythingLLM 索引失败
@@ -347,7 +435,68 @@ docker-compose restart backend nginx
 - ⏳ 批量导出（下载整个 Obsidian 库）
 - ⏳ 离线模式（Service Worker 缓存）
 - ⏳ 数据统计 Dashboard
+- ✅ 分片上传（已完成，支持大文件和进度显示）
 
 ---
 
 **测试完成后，请将测试结果反馈给开发团队**
+
+---
+
+## 10. 新增API端点（2026-01-21）
+
+### 10.1 POST /api/upload-chunk
+
+**功能**：上传文件分片
+
+**请求**：
+```json
+{
+  "chunk": "<binary data>",
+  "chunkIndex": 0,
+  "totalChunks": 10,
+  "fileId": "session-uuid",
+  "fileName": "large-book.pdf",
+  "ownerId": "child_1"
+}
+```
+
+**响应**：
+```json
+{
+  "success": true
+}
+```
+
+### 10.2 POST /api/upload-chunk?action=merge
+
+**功能**：合并所有分片为最终文件
+
+**请求**：
+```json
+{
+  "fileId": "session-uuid",
+  "fileName": "large-book.pdf",
+  "ownerId": "child_1"
+}
+```
+
+**响应**：
+```json
+{
+  "success": true,
+  "filePath": "/uploads/files/uuid.pdf"
+}
+```
+
+**安全特性**：
+- fileId 格式验证（防止路径遍历）
+- fileName 净化处理
+- 分片索引范围检查
+- 文件大小限制（10MB/片）
+- 最多10,000个分片
+
+**使用场景**：
+- 大文件上传（>5MB）
+- 网络不稳定环境
+- 需要进度反馈的场景
