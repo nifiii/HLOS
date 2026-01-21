@@ -27,6 +27,11 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 // 请求日志
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} ${req.method} ${req.path}`);
+  // 详细日志：记录 Content-Type 和请求头
+  if (req.path.includes('upload')) {
+    console.log('  Content-Type:', req.get('content-type'));
+    console.log('  Content-Length:', req.get('content-length'));
+  }
   next();
 });
 
@@ -51,6 +56,14 @@ app.use('/api', saveBookRouter);
 app.use('/api', booksRouter);
 app.use('/api', uploadChunkRouter);
 app.use('/api', uploadBookRouter);
+
+// 测试端点：验证 FormData 请求
+app.post('/api/test-upload', (req, res) => {
+  console.log('测试端点被调用');
+  console.log('Headers:', req.headers['content-type']);
+  console.log('Body keys:', Object.keys(req.body));
+  res.json({ success: true, message: '测试成功' });
+});
 
 // 404 处理
 app.use((req, res) => {
