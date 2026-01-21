@@ -26,7 +26,8 @@ export const useChunkedUpload = (): UseChunkedUploadReturn => {
     endpoint: string
   ): Promise<ChunkedUploadResult> => {
     const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-    const fileId = `${Date.now()}-${file.name}`;
+    // 使用纯时间戳作为 fileId，避免中文文件名导致验证失败
+    const fileId = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
     let uploadedChunks = 0;
 
     setIsUploading(true);
