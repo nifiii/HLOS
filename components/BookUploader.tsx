@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Upload, FileText, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { EBook, IndexStatus } from '../types';
+import { useChunkedUpload } from '../hooks/useChunkedUpload';
+import UploadProgressBar from './UploadProgressBar';
 
 interface UploadResult {
   fileName: string;
@@ -25,10 +27,10 @@ interface BookUploaderProps {
 }
 
 export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, ownerId }) => {
-  const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<string>('');
+  const { uploadProgress, isUploading, uploadFile, resetProgress } = useChunkedUpload();
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -48,45 +50,45 @@ export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, own
       return;
     }
 
-    setUploading(true);
+    setSelectedFile(file);
     setError('');
     setSuccess(false);
-    setUploadProgress('正在上传文件...');
 
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('ownerId', ownerId);
+    // 使用分片上传
+    const result = await uploadFile(file, ownerId, '/api/upload-book');
 
-      const response = await fetch('/api/save-book', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const result = await response.json();
-
-      if (!result.success) {
-        throw new Error(result.error || '上传失败');
-      }
-
-      setUploadProgress('文件解析成功！');
+    if (result.success) {
       setSuccess(true);
 
-      // 通知父组件
-      onUploadSuccess(result.data);
+      // 通知父组件 - 分片上传完成后，需要从服务器获取完整的数据
+      // 这里暂时使用文件名作为基本信息，实际数据会在后端处理完成后返回
+      const uploadResult: UploadResult = {
+        fileName: file.name,
+        fileFormat: file.type.split('/')[1] as 'pdf' | 'epub' | 'txt',
+        fileSize: file.size,
+        pageCount: 0, // 会在后端解析后更新
+        content: '', // 会在后端解析后更新
+        metadata: {
+          title: file.name.replace(/\.[^/.]+$/, ''),
+          subject: '',
+          category: '',
+          grade: '',
+          tags: [],
+          tableOfContents: []
+        }
+      };
+
+      onUploadSuccess(uploadResult);
 
       // 重置表单
       setTimeout(() => {
         setSuccess(false);
-        setUploadProgress('');
+        setSelectedFile(null);
+        resetProgress();
         event.target.value = '';
       }, 2000);
-    } catch (err) {
-      console.error('上传失败:', err);
-      const message = err instanceof Error ? err.message : '上传失败，请重试';
-      setError(message);
-    } finally {
-      setUploading(false);
+    } else {
+      setError(result.error || '上传失败，请重试');
     }
   };
 
@@ -105,7 +107,7 @@ export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, own
             flex flex-col items-center justify-center
             border-2 border-dashed rounded-lg p-8
             cursor-pointer transition-all
-            ${uploading ? 'border-gray-300 bg-gray-50 cursor-not-allowed' : 'border-blue-300 bg-blue-50 hover:bg-blue-100'}
+            ${isUploading ? 'border-gray-300 bg-gray-50 cursor-not-allowed' : 'border-blue-300 bg-blue-50 hover:bg-blue-100'}
           `}
         >
           <Upload className="w-12 h-12 text-blue-600 mb-3" />
@@ -120,17 +122,17 @@ export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, own
             type="file"
             accept=".pdf,.epub,.txt"
             onChange={handleFileChange}
-            disabled={uploading}
+            disabled={isUploading}
             className="hidden"
           />
         </label>
 
         {/* 上传进度 */}
-        {uploading && (
-          <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
-            <span className="text-sm text-blue-800">{uploadProgress}</span>
-          </div>
+        {uploadProgress && (
+          <UploadProgressBar
+            progress={uploadProgress}
+            fileName={selectedFile?.name || ''}
+          />
         )}
 
         {/* 成功提示 */}
