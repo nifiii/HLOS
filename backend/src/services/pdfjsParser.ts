@@ -2,9 +2,11 @@ import * as pdfjsLib from 'pdfjs-dist';
 import { PageExtractionResult, CoverImageResult } from '../types/pdf.js';
 
 // 配置 worker (pdfjs-dist v3+ 需要手动配置 worker)
-// 在 Node.js 环境中使用 npm 包
-const pdfjsWorker = require('pdfjs-dist/build/pdf.worker.cjs');
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+// 在 Node.js 环境中使用文件路径
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.cjs',
+  import.meta.url
+).toString();
 
 /**
  * 提取 PDF 前 N 页的文本内容
