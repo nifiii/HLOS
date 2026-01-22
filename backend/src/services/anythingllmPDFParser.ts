@@ -1,8 +1,9 @@
 import fs from 'fs/promises';
+import FormData from 'form-data';
 
 /**
  * AnythingLLM PDF 解析服务
- * 使用 AnythingLLM 的原生 PDF 处理能力提取文本和元数据
+ * 直接将 PDF 发送给 AnythingLLM 处理，不使用 Node.js 解析
  *
  * AnythingLLM 部署位置：http://127.0.0.1:3001
  * API 文档：https://docs.useanything.com/features/api
@@ -12,13 +13,13 @@ const ANYTHINGLLM_API_URL = process.env.ANYTHINGLLM_API_URL || 'http://127.0.0.1
 const ANYTHINGLLM_API_KEY = process.env.ANYTHINGLLM_API_KEY;
 
 /**
- * 使用 AnythingLLM 的 raw-text API 提取图书元数据
- * @param pdfTextContent PDF 的文本内容（通过 pdf-parse 提取）
+ * 使用 AnythingLLM 提取图书元数据
+ * @param pdfFilePath PDF 文件的绝对路径
  * @param fileName 文件名
  * @returns 提取的元数据
  */
 export async function extractBookMetadataWithAnythingLLM(
-  pdfTextContent: string,
+  pdfFilePath: string,
   fileName: string
 ): Promise<{
   title: string;
@@ -32,9 +33,9 @@ export async function extractBookMetadataWithAnythingLLM(
 }> {
   try {
     console.log('========================================');
-    console.log('使用 AnythingLLM 提取图书元数据');
+    console.log('使用 AnythingLLM 处理 PDF 并提取元数据');
+    console.log('文件路径:', pdfFilePath);
     console.log('文件名:', fileName);
-    console.log('文本长度:', pdfTextContent.length);
     console.log('AnythingLLM API:', ANYTHINGLLM_API_URL);
     console.log('========================================');
 
@@ -43,22 +44,55 @@ export async function extractBookMetadataWithAnythingLLM(
       throw new Error('ANYTHINGLLM_API_KEY 未配置');
     }
 
-    // 取前 3000 字符（约等于前 3-4 页）
-    const firstPagesText = pdfTextContent.substring(0, 3000);
+    // 第一步：上传 PDF 到 AnythingLLM
+    console.log('步骤 1/2: 上传 PDF 到 AnythingLLM...');
 
-    console.log('前 3000 字符预览:', firstPagesText.substring(0, 200));
+    const fileBuffer = await fs.readFile(pdfFilePath);
+    console.log('✓ PDF 文件读取成功，大小:', fileBuffer.length, 'bytes');
 
-    // 构建提示词
-    const prompt = `你是一个专业的图书元数据提取助手。请从以下教材 PDF 的前 4 页文本中，提取图书的基本信息。
+    // 构建 FormData
+    const formData = new FormData();
+    formData.append('file', fileBuffer, {
+      filename: fileName,
+      contentType: 'application/pdf',
+    });
+    formData.append('title', fileName);
 
-【文件名】${fileName}
+    // 上传 PDF 到 AnythingLLM
+    const uploadResponse = await fetch(`${ANYTHINGLLM_API_URL}/api/v1/document/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${ANYTHINGLLM_API_KEY}`,
+        ...formData.getHeaders(),
+      },
+      body: formData,
+    });
 
-【前 4 页文本内容】
-${firstPagesText}
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text();
+      console.error('❌ AnythingLLM 上传失败:', errorText);
+      throw new Error(`AnythingLLM 上传失败: ${uploadResponse.statusText} - ${errorText}`);
+    }
+
+    const uploadData = await uploadResponse.json() as {
+      success: boolean;
+      document?: {
+        id: string;
+        title: string;
+      };
+    };
+
+    console.log('✓ PDF 上传成功');
+    console.log('文档 ID:', uploadData.document?.id);
+
+    // 第二步：使用 AnythingLLM 聊天 API 提取元数据
+    console.log('步骤 2/2: 调用 AnythingLLM 提取元数据...');
+
+    const prompt = `你是一个专业的图书元数据提取助手。请从已上传的教材 PDF 文件"【${fileName}】"中，提取图书的基本信息。
 
 请严格按照以下 JSON 格式返回元数据，不要添加任何其他文字说明：
 {
-  "title": "书名（如果在前4页找不到，使用文件名去除扩展名）",
+  "title": "书名（如果找不到，使用文件名去除扩展名）",
   "author": "作者或编者（如果没有则为空字符串）",
   "subject": "学科（必须从以下选项选择：语文、数学、英语、物理、化学、生物、历史、地理、政治、其他）",
   "grade": "年级（格式示例：一年级上册、二年级下册、高一上册、高三下册，如果无法确定则为空字符串）",
@@ -75,13 +109,10 @@ ${firstPagesText}
 4. **类型**：教材类图书默认选择"教科书"
 5. **出版社**：查找"出版社出版"或"出版社"等关键词
 6. **出版时间**：查找"202X年X月"或"202X.X"格式，转换为 YYYY-MM
-7. **置信度**：如果前4页信息充足，设置 0.8-1.0；信息缺失较多，设置 0.3-0.7
+7. **置信度**：如果信息充足，设置 0.8-1.0；信息缺失较多，设置 0.3-0.7
 
-现在请提取并返回 JSON：`;
+现在请从 PDF 文件中提取并返回 JSON：`;
 
-    console.log('调用 AnythingLLM 聊天 API...');
-
-    // 使用 AnythingLLM 的 chat API
     const chatResponse = await fetch(`${ANYTHINGLLM_API_URL}/api/v1/workspace/default/chat`, {
       method: 'POST',
       headers: {
@@ -96,17 +127,17 @@ ${firstPagesText}
 
     if (!chatResponse.ok) {
       const errorText = await chatResponse.text();
-      console.error('❌ AnythingLLM API 错误:', errorText);
-      throw new Error(`AnythingLLM API 错误: ${chatResponse.statusText} - ${errorText}`);
+      console.error('❌ AnythingLLM 聊天失败:', errorText);
+      throw new Error(`AnythingLLM 聊天失败: ${chatResponse.statusText} - ${errorText}`);
     }
 
     const chatData = await chatResponse.json() as {
       textResponse?: string;
       response?: string;
     };
+
     console.log('AnythingLLM 原始响应:', JSON.stringify(chatData).substring(0, 500));
 
-    // 提取文本响应
     const responseText = chatData.textResponse || chatData.response || '';
 
     if (!responseText) {

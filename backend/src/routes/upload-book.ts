@@ -175,32 +175,23 @@ router.post('/upload-book/parse', async (req: Request, res: Response) => {
         case 'pdf':
           console.log('========================================');
           console.log('开始处理 PDF 文件');
+          console.log('文件路径:', fullPath);
           console.log('========================================');
 
-          // 使用 pdf-parse 提取文本和元数据
-          const pdfData = await parsePDF(fileBuffer);
+          // 直接使用 AnythingLLM 处理 PDF，不使用 Node.js 解析
+          console.log('调用 AnythingLLM 处理 PDF 并提取元数据...');
+          const aiMetadata = await extractBookMetadataWithAnythingLLM(fullPath, fileName);
 
-          console.log('✓ PDF 解析成功');
-          console.log('总页数:', pdfData.pageCount);
-          console.log('完整文本长度:', pdfData.content.length, '字符');
-
-          // 取前 3000 字符（约等于前 3-4 页）
-          const firstPagesText = pdfData.content.substring(0, 3000);
-
-          console.log('========================================');
-          console.log('前 3000 字符预览（用于 AI 分析）:');
-          console.log(firstPagesText.substring(0, 500));
-          console.log('========================================');
-
-          // 使用 AnythingLLM 提取元数据
-          console.log('调用 AnythingLLM 提取元数据...');
-          const aiMetadata = await extractBookMetadataWithAnythingLLM(pdfData.content, fileName);
-
-          pageCount = pdfData.pageCount;
+          // 获取页数（使用简单方法，避免 pdf-parse 的错误）
+          try {
+            pageCount = await extractPDFMetadata(fileBuffer).then(r => r.pageCount).catch(() => 0);
+          } catch {
+            pageCount = 0;
+          }
 
           console.log('========================================');
           console.log('✓ PDF 处理成功');
-          console.log('总页数:', pageCount);
+          console.log('总页数:', pageCount || '未知');
           console.log('AI 提取的元数据:', JSON.stringify(aiMetadata));
           console.log('========================================');
 
