@@ -110,10 +110,13 @@ export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, own
         const defaultMetadata = {
           title: file.name.replace(/\.(pdf|epub|txt)$/i, ''),
           author: '',
-          subject: '',
-          category: '教材',
+          subject: '其他',
           grade: '',
-          tags: []
+          category: '教科书',
+          publisher: '',
+          publishDate: '',
+          tags: [],
+          coverImage: null
         };
 
         setUploadResult({
@@ -205,7 +208,7 @@ export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, own
         {success && !showEditor && (
           <div className="flex items-center gap-3 p-4 bg-green-50 rounded-lg border border-green-200">
             <CheckCircle className="w-5 h-5 text-green-600" />
-            <span className="text-sm text-green-800">上传成功！AI 正在分析图书内容...</span>
+            <span className="text-sm text-green-800">上传成功！AI 正在分析图书信息...</span>
           </div>
         )}
 
@@ -235,6 +238,7 @@ export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, own
           metadata={uploadResult.metadata}
           onSave={handleSaveMetadata}
           onCancel={() => setShowEditor(false)}
+          userName={ownerId}  // 传递用户名作为默认标签
         />
       )}
     </div>
