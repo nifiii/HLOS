@@ -49,21 +49,19 @@ export async function extractBookMetadataWithAnythingLLM(
       throw new Error('ANYTHINGLLM_API_KEY 未配置');
     }
 
-    // 第一步：上传 PDF 到 AnythingLLM
-    console.log('步骤 1/2: 上传 PDF 到 AnythingLLM...');
+    // 读取 PDF 文件内容
+    console.log('读取 PDF 文件...');
+    const fileBuffer = await fsPromises.readFile(pdfFilePath);
+    console.log('✓ PDF 文件读取成功，大小:', fileBuffer.length, 'bytes');
 
-    // 使用 createReadStream 读取文件（而不是 readFileSync + Buffer）
-    const fileStream = fs.createReadStream(pdfFilePath);
-    console.log('✓ PDF 文件流创建成功');
-
-    // 构建 FormData - 文件流方式
+    // 使用 FormData 直接发送文件
     const formData = new FormData();
-    formData.append('file', fileStream, {
+    formData.append('file', fileBuffer, {
       filename: fileName,
       contentType: 'application/pdf',
     });
 
-    console.log('FormData 构建完成，开始上传...');
+    console.log('开始上传 PDF 到 AnythingLLM...');
 
     // 上传 PDF 到 AnythingLLM
     const uploadResponse = await fetch(ANYTHINGLLM_UPLOAD_ENDPOINT, {
@@ -75,10 +73,23 @@ export async function extractBookMetadataWithAnythingLLM(
       body: formData,
     });
 
+    console.log('上传响应状态:', uploadResponse.status, uploadResponse.statusText);
+
     if (!uploadResponse.ok) {
       const errorText = await uploadResponse.text();
-      console.error('❌ AnythingLLM 上传失败:', errorText);
+      console.error('❌ AnythingLLM 上传失败:', uploadResponse.status, uploadResponse.statusText);
+      console.error('响应内容:', errorText.substring(0, 500));
       throw new Error(`AnythingLLM 上传失败: ${uploadResponse.statusText} - ${errorText}`);
+    }
+
+    const contentType = uploadResponse.headers.get('content-type');
+    console.log('响应 Content-Type:', contentType);
+
+    if (!contentType || !contentType.includes('application/json')) {
+      const errorText = await uploadResponse.text();
+      console.error('❌ AnythingLLM 返回非 JSON 响应');
+      console.error('响应内容:', errorText.substring(0, 500));
+      throw new Error(`AnythingLLM 返回非 JSON 响应: ${contentType}`);
     }
 
     const uploadData = await uploadResponse.json() as {
