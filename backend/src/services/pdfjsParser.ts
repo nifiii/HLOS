@@ -1,23 +1,13 @@
 import pkg from 'pdfjs-dist';
-const { getDocument, GlobalWorkerOptions, version } = pkg;
+const { getDocument, version } = pkg;
 import { PageExtractionResult, CoverImageResult } from '../types/pdf.js';
-import path from 'path';
 
 // 检查 pdfjs-dist 版本
 console.log(`pdfjs-dist 版本: ${version}`);
 
-// 配置 worker (pdfjs-dist v3+ 需要手动配置 worker)
-// 使用绝对路径指向 worker ��件
-const workerPath = path.join(
-  process.cwd(),
-  'node_modules',
-  'pdfjs-dist',
-  'build',
-  'pdf.worker.min.mjs'
-);
-
-console.log(`配置 Worker 路径: ${workerPath}`);
-GlobalWorkerOptions.workerSrc = workerPath;
+// Node.js 环境不配置 worker，使用内置的 fake worker
+// pdfjs-dist 会自动检测环境并�� Node.js 中使用同步处理
+console.log('✓ Node.js 环境，使用内置处理方式（无需 worker）');
 
 /**
  * 提取 PDF 前 N 页的文本内容
