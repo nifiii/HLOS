@@ -1,15 +1,10 @@
-import * as pdfjsLib from 'pdfjs-dist';
+import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
 import { PageExtractionResult, CoverImageResult } from '../types/pdf.js';
 import path from 'path';
-import { fileURLToPath } from 'url';
 
 // 配置 worker (pdfjs-dist v3+ 需要手动配置 worker)
 // 使用绝对路径指向 worker 文件
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// 在 Node.js 环境中，使用相对于 node_modules 的路径
-pdfjsLib.GlobalWorkerOptions.workerSrc = path.join(
+GlobalWorkerOptions.workerSrc = path.join(
   process.cwd(),
   'node_modules',
   'pdfjs-dist',
@@ -29,7 +24,7 @@ export async function extractFirstPages(
 ): Promise<PageExtractionResult[]> {
   try {
     // 加载 PDF 文档
-    const loadingTask = pdfjsLib.getDocument({ data: buffer });
+    const loadingTask = getDocument({ data: buffer });
     const pdfDocument = await loadingTask.promise;
 
     const totalPages = pdfDocument.numPages;
@@ -73,7 +68,7 @@ export async function extractFirstPages(
  */
 export async function extractCoverImage(buffer: Buffer): Promise<CoverImageResult | null> {
   try {
-    const loadingTask = pdfjsLib.getDocument({ data: buffer });
+    const loadingTask = getDocument({ data: buffer });
     const pdfDocument = await loadingTask.promise;
 
     const page = await pdfDocument.getPage(1);
@@ -106,7 +101,7 @@ export async function extractCoverImage(buffer: Buffer): Promise<CoverImageResul
  */
 export async function getPDFPageCount(buffer: Buffer): Promise<number> {
   try {
-    const loadingTask = pdfjsLib.getDocument({ data: buffer });
+    const loadingTask = getDocument({ data: buffer });
     const pdfDocument = await loadingTask.promise;
     return pdfDocument.numPages;
   } catch (error) {
