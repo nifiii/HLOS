@@ -5,6 +5,8 @@ import fs from 'fs/promises';
 import { extractPDFMetadata, parsePDF } from '../services/pdfParser.js';
 import { parseEPUB } from '../services/epubParser.js';
 import { analyzeBookMetadata } from '../services/bookMetadataAnalyzer.js';
+import { extractFirstPages, extractCoverImage, getPDFPageCount } from '../services/pdfjsParser.js';
+import { extractBookMetadataFromPages } from '../services/bookMetadataAIAnalyzer.js';
 
 const router = express.Router();
 
@@ -150,24 +152,73 @@ router.post('/upload-book/parse', async (req: Request, res: Response) => {
     try {
       switch (fileFormat) {
         case 'pdf':
-          console.log('提取 PDF 内置元数据...');
-          const pdfData = await extractPDFMetadata(fileBuffer);
-          basicMetadata = pdfData.estimatedMetadata;
-          pageCount = pdfData.pageCount;
-          console.log(`PDF 元数据提取成功，页数: ${pageCount}`);
-          console.log(`内置元数据:`, JSON.stringify(basicMetadata));
+          console.log('提取 PDF 前 4 页文本...');
+
+          // 1. 提取前 4 页文本
+          const firstPages = await extractFirstPages(fileBuffer, 4);
+          const pageTexts = firstPages.map(p => p.text);
+
+          // 2. 调用 AI 提取元数据
+          console.log('调用 AI 提取元数据...');
+          const aiMetadata = await extractBookMetadataFromPages(pageTexts, fileName);
+
+          // 3. 提取封面图片
+          console.log('提取封面图片...');
+          const coverImage = await extractCoverImage(fileBuffer);
+
+          // 4. 获取总页数
+          pageCount = await getPDFPageCount(fileBuffer);
+
+          console.log(`PDF 处理成功，页数: ${pageCount}`);
+          console.log(`AI 提取的元数据:`, JSON.stringify(aiMetadata));
+
+          basicMetadata = {
+            title: aiMetadata.title,
+            author: aiMetadata.author,
+            subject: aiMetadata.subject,
+            grade: aiMetadata.grade,
+            category: aiMetadata.category,
+            publisher: aiMetadata.publisher,
+            publishDate: aiMetadata.publishDate,
+            coverImage: coverImage?.base64 || null,
+            coverFormat: coverImage?.format || 'png',
+            aiConfidence: aiMetadata.confidence,
+          };
           break;
+
         case 'epub':
           console.log('解析 EPUB...');
           const epubData = await parseEPUB(fileBuffer);
-          basicMetadata = epubData.estimatedMetadata;
+          basicMetadata = {
+            title: epubData.estimatedMetadata.title || fileName.replace(/\.epub$/i, ''),
+            author: epubData.estimatedMetadata.author || '',
+            subject: '其他',
+            grade: '',
+            category: '教科书',
+            publisher: '',
+            publishDate: '',
+            coverImage: null,
+            aiConfidence: 0.5,
+          };
           pageCount = epubData.pageCount;
           console.log(`EPUB 解析成功，页数: ${pageCount}`);
           break;
+
         case 'txt':
-          basicMetadata = {};
+          basicMetadata = {
+            title: fileName.replace(/\.txt$/i, ''),
+            author: '',
+            subject: '其他',
+            grade: '',
+            category: '课外读物',
+            publisher: '',
+            publishDate: '',
+            coverImage: null,
+            aiConfidence: 0.5,
+          };
           pageCount = 1;
           break;
+
         default:
           return res.status(400).json({
             success: false,
@@ -175,14 +226,17 @@ router.post('/upload-book/parse', async (req: Request, res: Response) => {
           });
       }
 
-      // 如果内置元数据为空，使用文件名作为默认书名
+      // 构建最终元数据
       const finalMetadata = {
         title: basicMetadata.title || fileName.replace(/\.(pdf|epub|txt)$/i, ''),
         author: basicMetadata.author || '',
-        subject: '',
-        category: '教材',
-        grade: '',
-        tags: []
+        subject: basicMetadata.subject || '其他',
+        grade: basicMetadata.grade || '',
+        category: basicMetadata.category || '教科书',
+        publisher: basicMetadata.publisher || '',
+        publishDate: basicMetadata.publishDate || '',
+        coverImage: basicMetadata.coverImage,
+        tags: []  // 前端会添加用户名作为默认标签
       };
 
       console.log('返回的元数据:', finalMetadata);
@@ -205,9 +259,11 @@ router.post('/upload-book/parse', async (req: Request, res: Response) => {
       const fallbackMetadata = {
         title: fileName.replace(/\.(pdf|epub|txt)$/i, ''),
         author: '',
-        subject: '',
-        category: '教材',
+        subject: '其他',
         grade: '',
+        category: '教科书',
+        publisher: '',
+        publishDate: '',
         tags: []
       };
 
