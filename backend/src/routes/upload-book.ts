@@ -5,7 +5,7 @@ import fs from 'fs/promises';
 import { extractPDFMetadata, parsePDF } from '../services/pdfParser.js';
 import { parseEPUB } from '../services/epubParser.js';
 import { analyzeBookMetadata } from '../services/bookMetadataAnalyzer.js';
-import { extractBookMetadataFromPages } from '../services/bookMetadataAIAnalyzer.js';
+import { extractBookMetadataWithAnythingLLM } from '../services/anythingllmPDFParser.js';
 
 const router = express.Router();
 
@@ -192,9 +192,9 @@ router.post('/upload-book/parse', async (req: Request, res: Response) => {
           console.log(firstPagesText.substring(0, 500));
           console.log('========================================');
 
-          // 调用 AI 提取元数据
-          console.log('调用 AI 提取元数据...');
-          const aiMetadata = await extractBookMetadataFromPages([firstPagesText], fileName);
+          // 使用 AnythingLLM 提取元数据
+          console.log('调用 AnythingLLM 提取元数据...');
+          const aiMetadata = await extractBookMetadataWithAnythingLLM(pdfData.content, fileName);
 
           pageCount = pdfData.pageCount;
 
