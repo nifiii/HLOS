@@ -12,6 +12,10 @@ import FormData from 'form-data';
 const ANYTHINGLLM_API_URL = process.env.ANYTHINGLLM_API_URL || 'http://127.0.0.1:3001';
 const ANYTHINGLLM_API_KEY = process.env.ANYTHINGLLM_API_KEY;
 
+// AnythingLLM 上传端点（注意：不是 /api/v1，而是 /v1）
+const ANYTHINGLLM_UPLOAD_ENDPOINT = `${ANYTHINGLLM_API_URL}/v1/document/upload`;
+const ANYTHINGLLM_CHAT_ENDPOINT = `${ANYTHINGLLM_API_URL}/v1/workspace/default/chat`;
+
 /**
  * 使用 AnythingLLM 提取图书元数据
  * @param pdfFilePath PDF 文件的绝对路径
@@ -47,19 +51,21 @@ export async function extractBookMetadataWithAnythingLLM(
     // 第一步：上传 PDF 到 AnythingLLM
     console.log('步骤 1/2: 上传 PDF 到 AnythingLLM...');
 
-    const fileBuffer = await fs.readFile(pdfFilePath);
-    console.log('✓ PDF 文件读取成功，大小:', fileBuffer.length, 'bytes');
+    // 使用 createReadStream 读取文件（而不是 readFileSync + Buffer）
+    const fileStream = fs.createReadStream(pdfFilePath);
+    console.log('✓ PDF 文件流创建成功');
 
-    // 构建 FormData
+    // 构建 FormData - 文件流方式
     const formData = new FormData();
-    formData.append('file', fileBuffer, {
+    formData.append('file', fileStream, {
       filename: fileName,
       contentType: 'application/pdf',
     });
-    formData.append('title', fileName);
+
+    console.log('FormData 构建完成，开始上传...');
 
     // 上传 PDF 到 AnythingLLM
-    const uploadResponse = await fetch(`${ANYTHINGLLM_API_URL}/api/v1/document/upload`, {
+    const uploadResponse = await fetch(ANYTHINGLLM_UPLOAD_ENDPOINT, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${ANYTHINGLLM_API_KEY}`,
@@ -113,7 +119,7 @@ export async function extractBookMetadataWithAnythingLLM(
 
 现在请从 PDF 文件中提取并返回 JSON：`;
 
-    const chatResponse = await fetch(`${ANYTHINGLLM_API_URL}/api/v1/workspace/default/chat`, {
+    const chatResponse = await fetch(ANYTHINGLLM_CHAT_ENDPOINT, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${ANYTHINGLLM_API_KEY}`,
