@@ -30,6 +30,11 @@ export async function extractFirstPages(
   pageCount: number = 4
 ): Promise<PageExtractionResult[]> {
   try {
+    console.log('========================================');
+    console.log('开始提取 PDF 前 N 页文本');
+    console.log('请求提取页数:', pageCount);
+    console.log('PDF Buffer 大小:', buffer.length, 'bytes');
+
     // 加载 PDF 文档
     const loadingTask = getDocument({ data: buffer });
     const pdfDocument = await loadingTask.promise;
@@ -37,12 +42,15 @@ export async function extractFirstPages(
     const totalPages = pdfDocument.numPages;
     const pagesToExtract = Math.min(pageCount, totalPages);
 
-    console.log(`PDF 总页数: ${totalPages}, 提取前 ${pagesToExtract} 页`);
+    console.log('PDF 总页数:', totalPages);
+    console.log('实际提取页数:', pagesToExtract);
+    console.log('----------------------------------------');
 
     const results: PageExtractionResult[] = [];
 
     // 逐页提取文本
     for (let i = 1; i <= pagesToExtract; i++) {
+      console.log(`开始提取第 ${i}/${pagesToExtract} 页...`);
       const page = await pdfDocument.getPage(i);
       const textContent = await page.getTextContent();
 
@@ -57,12 +65,27 @@ export async function extractFirstPages(
         pageNumber: i,
       });
 
-      console.log(`第 ${i} 页提取完成，文本长度: ${pageText.length}`);
+      console.log(`✓ 第 ${i} 页提取完成`);
+      console.log(`  文本长度: ${pageText.length} 字符`);
+      console.log(`  文本预览（前 100 字符）: ${pageText.substring(0, 100)}`);
+      console.log('----------------------------------------');
     }
+
+    console.log('========================================');
+    console.log('✓ PDF 文本提取完成');
+    console.log('总页数提取:', results.length);
+    console.log('========================================');
 
     return results;
   } catch (error) {
-    console.error('PDF 页面提取失败:', error);
+    console.error('========================================');
+    console.error('❌ PDF 页面提取失败');
+    console.error('错误详情:', error);
+    if (error instanceof Error) {
+      console.error('错误消息:', error.message);
+      console.error('错误堆栈:', error.stack);
+    }
+    console.error('========================================');
     const message = error instanceof Error ? error.message : '未知错误';
     throw new Error(`PDF 页面提取失败: ${message}`);
   }

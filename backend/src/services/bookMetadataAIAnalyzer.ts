@@ -25,19 +25,27 @@ export async function extractBookMetadataFromPages(
   fileName: string
 ): Promise<BookMetadataAI> {
   try {
-    console.log('开始 AI 元数据提取，输入文本页数:', firstPagesText.length);
+    console.log('========================================');
+    console.log('开始 AI 元数据提取');
+    console.log('文件名:', fileName);
+    console.log('输入文本页数:', firstPagesText.length);
+    console.log('========================================');
 
     // 合并前 4 页文本
     const combinedText = firstPagesText.join('\n\n--- 页面分隔 ---\n\n');
+    console.log('合并文本长度:', combinedText.length);
+    console.log('前 200 字符预览:', combinedText.substring(0, 200));
 
     // 从环境变量读取 API Key
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      console.error('GEMINI_API_KEY not configured');
+      console.error('❌ GEMINI_API_KEY 未配置');
       throw new Error('GEMINI_API_KEY not configured');
     }
+    console.log('✓ GEMINI_API_KEY 已配置');
 
     const ai = new GoogleGenAI({ apiKey });
+    console.log('✓ GoogleGenAI 客户端初始化成功');
 
     // 设计精准的提示词
     const prompt = `你是一个专业的图书元数据提取助手。请从以下教材 PDF 的前 4 页文本中，提取图书的基本信息。
@@ -72,6 +80,10 @@ ${combinedText}
 现在请提取并返回 JSON：`;
 
     // 调用 Gemini AI
+    console.log('========================================');
+    console.log('调用 Gemini AI 模型: gemini-2.0-flash-exp');
+    console.log('========================================');
+
     const response = await ai.models.generateContent({
       model: 'gemini-2.0-flash-exp',
       contents: prompt,
@@ -102,18 +114,40 @@ ${combinedText}
     });
 
     if (!response.text) {
+      console.error('❌ AI 响应内容为空');
       throw new Error("AI 响应内容为空");
     }
 
+    console.log('AI 原始响应长度:', response.text.length);
+    console.log('AI 原始响应（前 500 字符）:', response.text.substring(0, 500));
+
     const result = JSON.parse(response.text) as BookMetadataAI;
 
-    console.log('AI 元数据提取成功:', result);
+    console.log('========================================');
+    console.log('✓ AI 元数据提取成功');
+    console.log('书名:', result.title);
+    console.log('作者:', result.author);
+    console.log('学科:', result.subject);
+    console.log('年级:', result.grade);
+    console.log('类型:', result.category);
+    console.log('出版社:', result.publisher);
+    console.log('出版时间:', result.publishDate);
+    console.log('置信度:', result.confidence);
+    console.log('========================================');
 
     return result;
   } catch (error) {
-    console.error('AI 元数据提取失败:', error);
+    console.error('========================================');
+    console.error('❌ AI 元数据提取失败');
+    console.error('错误详情:', error);
+    if (error instanceof Error) {
+      console.error('错误消息:', error.message);
+      console.error('错误堆栈:', error.stack);
+    }
+    console.error('========================================');
 
     // 降级处理：返回基于文件名的默认值
+    console.log('使用降级方案：基于文件名生成默认元数据');
     const fallbackTitle = fileName.replace(/\.(pdf|epub|txt)$/i, '');
 
     return {
