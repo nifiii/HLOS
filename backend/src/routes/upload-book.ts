@@ -5,7 +5,6 @@ import fs from 'fs/promises';
 import { extractPDFMetadata, parsePDF } from '../services/pdfParser.js';
 import { parseEPUB } from '../services/epubParser.js';
 import { analyzeBookMetadata } from '../services/bookMetadataAnalyzer.js';
-import { extractFirstPages, extractCoverImage, getPDFPageCount } from '../services/pdfjsParser.js';
 import { extractBookMetadataFromPages } from '../services/bookMetadataAIAnalyzer.js';
 
 const router = express.Router();
@@ -174,25 +173,36 @@ router.post('/upload-book/parse', async (req: Request, res: Response) => {
     try {
       switch (fileFormat) {
         case 'pdf':
-          console.log('提取 PDF 前 4 页文本...');
+          console.log('========================================');
+          console.log('开始处理 PDF 文件');
+          console.log('========================================');
 
-          // 1. 提取前 4 页文本
-          const firstPages = await extractFirstPages(fileBuffer, 4);
-          const pageTexts = firstPages.map(p => p.text);
+          // 使用 pdf-parse 提取文本和元数据
+          const pdfData = await parsePDF(fileBuffer);
 
-          // 2. 调用 AI 提取元数据
+          console.log('✓ PDF 解析成功');
+          console.log('总页数:', pdfData.pageCount);
+          console.log('完整文本长度:', pdfData.content.length, '字符');
+
+          // 取前 3000 字符（约等于前 3-4 页）
+          const firstPagesText = pdfData.content.substring(0, 3000);
+
+          console.log('========================================');
+          console.log('前 3000 字符预览（用于 AI 分析）:');
+          console.log(firstPagesText.substring(0, 500));
+          console.log('========================================');
+
+          // 调用 AI 提取元数据
           console.log('调用 AI 提取元数据...');
-          const aiMetadata = await extractBookMetadataFromPages(pageTexts, fileName);
+          const aiMetadata = await extractBookMetadataFromPages([firstPagesText], fileName);
 
-          // 3. 提取封面图片
-          console.log('提取封面图片...');
-          const coverImage = await extractCoverImage(fileBuffer);
+          pageCount = pdfData.pageCount;
 
-          // 4. 获取总页数
-          pageCount = await getPDFPageCount(fileBuffer);
-
-          console.log(`PDF 处理成功，页数: ${pageCount}`);
-          console.log(`AI 提取的元数据:`, JSON.stringify(aiMetadata));
+          console.log('========================================');
+          console.log('✓ PDF 处理成功');
+          console.log('总页数:', pageCount);
+          console.log('AI 提取的元数据:', JSON.stringify(aiMetadata));
+          console.log('========================================');
 
           basicMetadata = {
             title: aiMetadata.title,
@@ -202,8 +212,8 @@ router.post('/upload-book/parse', async (req: Request, res: Response) => {
             category: aiMetadata.category,
             publisher: aiMetadata.publisher,
             publishDate: aiMetadata.publishDate,
-            coverImage: coverImage?.base64 || null,
-            coverFormat: coverImage?.format || 'png',
+            coverImage: null,
+            coverFormat: 'png',
             aiConfidence: aiMetadata.confidence,
           };
           break;
