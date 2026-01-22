@@ -226,8 +226,14 @@ cd $INSTALL_DIR/backend
 npm install --omit=dev --production 2>/dev/null || npm install --omit=dev
 cd - > /dev/null
 
-# 复制环境变量
-cp .env $INSTALL_DIR/.env
+# 复制环境变量（优先使用已存在的配置）
+if [ -f "/opt/hl-os/.env" ]; then
+  echo "   → 使用现有配置: /opt/hl-os/.env"
+  cp /opt/hl-os/.env $INSTALL_DIR/.env
+else
+  echo "   → 使用当前目录配置: .env"
+  cp .env $INSTALL_DIR/.env
+fi
 chmod 600 $INSTALL_DIR/.env
 
 # 设置权限
