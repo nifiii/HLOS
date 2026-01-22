@@ -8,12 +8,18 @@ const router = express.Router();
 
 // 临时目录配置
 const TEMP_DIR = path.join(process.cwd(), 'uploads', 'temp');
-const UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'files');
+const DATA_DIR = path.join(process.cwd(), 'data', 'originals', 'books');
 
 // 确保目录存在
-const ensureDirs = async () => {
+const ensureDirs = async (ownerId?: string) => {
   await fs.mkdir(TEMP_DIR, { recursive: true });
-  await fs.mkdir(UPLOAD_DIR, { recursive: true });
+
+  if (ownerId) {
+    const userDir = path.join(process.cwd(), 'data', 'originals', 'books', ownerId);
+    await fs.mkdir(userDir, { recursive: true });
+  } else {
+    await fs.mkdir(DATA_DIR, { recursive: true });
+  }
 };
 
 // Multer 配置（内存存储）
@@ -139,10 +145,14 @@ async function handleMerge(req: Request, res: Response): Promise<void> {
       return indexA - indexB;
     });
 
+    // 创建按 ownerId 归档的目录结构
+    const userBooksDir = path.join(process.cwd(), 'data', 'originals', 'books', ownerId);
+    await fs.mkdir(userBooksDir, { recursive: true });
+
     // 生成最终文件路径
     const ext = path.extname(safeFileName);
-    const finalFileName = `${uuidv4()}${ext}`;
-    finalPath = path.join(UPLOAD_DIR, finalFileName);
+    const finalFileName = `${fileId}${ext}`;
+    finalPath = path.join(userBooksDir, finalFileName);
 
     // 合并分片（使用流式写入避免大文件内存问题）
     const fileHandles = await Promise.all(
@@ -164,8 +174,8 @@ async function handleMerge(req: Request, res: Response): Promise<void> {
     // 清理临时分片
     await fs.rm(chunkDir, { recursive: true });
 
-    // 返回相对路径（供前端使用）
-    const relativePath = `/uploads/files/${finalFileName}`;
+    // 返回相对��径（包含 ownerId）
+    const relativePath = `/data/originals/books/${ownerId}/${finalFileName}`;
 
     console.log(`文件合并成功: ${safeFileName} -> ${relativePath}`);
 

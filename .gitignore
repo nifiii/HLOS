@@ -42,3 +42,7 @@ ssl/
 
 # Git worktrees
 .worktrees/
+
+# User uploaded data
+data/
+uploads/
