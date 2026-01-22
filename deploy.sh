@@ -394,43 +394,7 @@ mkdir -p $INSTALL_DIR/anythingllm-hotdir
 mkdir -p $INSTALL_DIR/anythingllm-storage/comkey
 mkdir -p $INSTALL_DIR/anythingllm-storage/documents
 mkdir -p $INSTALL_DIR/anythingllm-storage/vector-cache
-
-# 🔑 预创建 API Key 表并插入 Key（使用 SQLite 命令行）
-echo "   → 预创建 AnythingLLM API Key..."
-
-DB_FILE="$INSTALL_DIR/anythingllm-storage/anythingllm.db"
-API_KEY_TOKEN="${ANYTHINGLLM_API_KEY}"
-API_KEY_TIMESTAMP=$(date +%s)
-
-# 使用 sqlite3 命令创建表并插入 API Key
-if command -v sqlite3 &> /dev/null; then
-  sqlite3 "$DB_FILE" <<EOF
--- 创建 api_keys 表
-CREATE TABLE IF NOT EXISTS api_keys (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  token TEXT UNIQUE NOT NULL,
-  createdBy INTEGER,
-  usage TEXT,
-  createdAt INTEGER,
-  lastUsed INTEGER,
-  expired INTEGER DEFAULT 0
-);
-
--- 插入 API Key
-INSERT OR REPLACE INTO api_keys (token, createdBy, usage, createdAt, expired)
-VALUES ('${API_KEY_TOKEN}', 1, 'PDF metadata extraction for HL-OS', ${API_KEY_TIMESTAMP}, 0);
-
--- 验证插入
-SELECT id, token FROM api_keys WHERE token = '${API_KEY_TOKEN}';
-EOF
-
-  echo "   ✓ API Key 已写入数据库: ${API_KEY_TOKEN:0:16}..."
-else
-  echo "   ⚠️  sqlite3 未安装，跳过预创建 API Key"
-  touch "$DB_FILE"
-fi
-
-touch "$INSTALL_DIR/anythingllm-storage/anythingllm.db-journal" 2>/dev/null || true
+touch $INSTALL_DIR/anythingllm-storage/anythingllm.db
 
 # 设置宽松权限
 echo "   → 设置存储目录权限..."
@@ -460,74 +424,7 @@ docker run -d \
   --memory-reservation="1g" \
   mintplexlabs/anythingllm:latest
 
-# 等待容器完全启动
-echo "   → 等待容器初始化..."
-sleep 10
-
-# 🔑 自动在 AnythingLLM 数据库中创建 API Key
-echo "   → 创建 AnythingLLM API Key..."
-
-# 使用 SQL 直接插入 API Key（避免 Node.js 模块依赖问题）
-API_KEY_TOKEN="${ANYTHINGLLM_API_KEY:-$(openssl rand -hex 32)}"
-API_KEY_TIMESTAMP=$(date +%s)
-
-# 创建 SQL 脚本
-cat > /tmp/create-api-key.sql <<EOF
--- 创建 api_keys 表（如果不存在）
-CREATE TABLE IF NOT EXISTS api_keys (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  token TEXT UNIQUE NOT NULL,
-  createdBy INTEGER,
-  usage TEXT,
-  createdAt INTEGER,
-  lastUsed INTEGER,
-  expired INTEGER DEFAULT 0
-);
-
--- 插入 API Key（忽略重复错误）
-INSERT OR IGNORE INTO api_keys (token, createdBy, usage, createdAt, expired)
-VALUES ('${API_KEY_TOKEN}', 1, 'PDF metadata extraction for HL-OS', ${API_KEY_TIMESTAMP}, 0);
-
--- 显示创建的 API Key
-SELECT '✓ API Key created: ${API_KEY_TOKEN}' as result;
-EOF
-
-# 将 SQL 脚本复制到容器并执行
-docker cp /tmp/create-api-key.sql hl-anythingllm:/tmp/
-
-# 使用 node 执行 SQL（AnythingLLM 容器内置 sqlite3）
-docker exec hl-anythingllm sh -c "cd /app/server && node -e \"
-const Database = require('sqlite3').Database;
-const fs = require('fs');
-const sql = fs.readFileSync('/tmp/create-api-key.sql', 'utf8');
-
-const db = new Database('/app/server/storage/anythingllm.db', (err) => {
-  if (err) {
-    console.error('Database error:', err.message);
-    process.exit(1);
-  }
-
-  db.exec(sql, (err) => {
-    if (err) {
-      console.error('SQL error:', err.message);
-      process.exit(1);
-    }
-    console.log('✓ AnythingLLM API Key created successfully');
-    console.log('Token:', '${API_KEY_TOKEN}');
-    db.close();
-  });
-});
-\"" 2>/dev/null
-
-# 如果脚本执行失败，提示手动创建
-if [ $? -ne 0 ]; then
-  echo "   ⚠️  自动创建 API Key 失败，请手动创建"
-  echo "   访问: http://127.0.0.1:3001"
-  echo "   Settings → API Keys → Create New Key"
-fi
-
 echo -e "${GREEN}✅ AnythingLLM 容器启动完成${NC}"
-echo "   API Key: ${ANYTHINGLLM_API_KEY:0:16}..."
 echo ""
 
 # ================================
@@ -606,3 +503,68 @@ echo "   1. 修改 /etc/nginx/conf.d/hl-os.conf 中的 server_name"
 echo "   2. 配置防火墙: firewall-cmd --add-service=http --permanent && firewall-cmd --reload"
 echo "   3. 如需HTTPS，参考: docs/SECURITY.md"
 echo ""
+
+# ================================
+# 10. 创建 AnythingLLM API Key
+# ================================
+echo "🔑 配置 AnythingLLM API Key..."
+echo "--------------------------------"
+
+# 等待 AnythingLLM 完全启动（健康检查通过后再等待）
+echo "等待 AnythingLLM 完全初始化..."
+sleep 20
+
+# 检查容器是否运行
+if ! docker ps | grep -q hl-anythingllm; then
+  echo -e "${RED}❌ AnythingLLM 容器未运行${NC}"
+  echo "请手动创建 API Key:"
+  echo "  1. 访问 http://127.0.0.1:3001"
+  echo "  2. 登录 AnythingLLM"
+  echo "  3. Settings → API Keys → Create New Key"
+  echo "  4. 复制 Key 到 /opt/.env 的 ANYTHINGLLM_API_KEY"
+  exit 1
+fi
+
+# 使用 sqlite3 直接操作数据库
+if command -v sqlite3 &> /dev/null; then
+  echo "使用 sqlite3 创建 API Key..."
+
+  API_KEY_TOKEN="${ANYTHINGLLM_API_KEY}"
+  API_KEY_TIMESTAMP=$(date +%s)
+  DB_FILE="$INSTALL_DIR/anythingllm-storage/anythingllm.db"
+
+  # 创建表并插入 API Key
+  sqlite3 "$DB_FILE" <<EOF
+-- 创建 api_keys 表
+CREATE TABLE IF NOT EXISTS api_keys (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  token TEXT UNIQUE NOT NULL,
+  createdBy INTEGER,
+  usage TEXT,
+  createdAt INTEGER,
+  lastUsed INTEGER,
+  expired INTEGER DEFAULT 0
+);
+
+-- 插入 API Key
+INSERT OR REPLACE INTO api_keys (token, createdBy, usage, createdAt, expired)
+VALUES ('${API_KEY_TOKEN}', 1, 'PDF metadata extraction for HL-OS', ${API_KEY_TIMESTAMP}, 0);
+
+-- 验证插入
+SELECT '✓ API Key: ' || substr(token, 1, 16) || '...' as result FROM api_keys WHERE token = '${API_KEY_TOKEN}';
+EOF
+
+  if [ $? -eq 0 ]; then
+    echo -e "${GREEN}✅ API Key 创建成功${NC}"
+    echo "   Token: ${API_KEY_TOKEN:0:16}..."
+  else
+    echo -e "${YELLOW}⚠️  sqlite3 创建失败，请手动创建${NC}"
+  fi
+else
+  echo -e "${YELLOW}⚠️  sqlite3 未安装，请手动创建 API Key${NC}"
+  echo "   安装 sqlite3: yum install -y sqlite"
+  echo "   或在 UI 中创建: http://127.0.0.1:3001"
+fi
+
+echo ""
+
