@@ -535,23 +535,12 @@ if command -v sqlite3 &> /dev/null; then
 
   # 创建表并插入 API Key
   sqlite3 "$DB_FILE" <<EOF
--- 创建 api_keys 表
-CREATE TABLE IF NOT EXISTS api_keys (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  token TEXT UNIQUE NOT NULL,
-  createdBy INTEGER,
-  usage TEXT,
-  createdAt INTEGER,
-  lastUsed INTEGER,
-  expired INTEGER DEFAULT 0
-);
-
--- 插入 API Key
-INSERT OR REPLACE INTO api_keys (token, createdBy, usage, createdAt, expired)
-VALUES ('${API_KEY_TOKEN}', 1, 'PDF metadata extraction for HL-OS', ${API_KEY_TIMESTAMP}, 0);
+-- 插入 API Key（AnythingLLM 表使用 secret 列）
+INSERT INTO api_keys (secret, createdBy, createdAt)
+VALUES ('${API_KEY_TOKEN}', 1, CURRENT_TIMESTAMP);
 
 -- 验证插入
-SELECT '✓ API Key: ' || substr(token, 1, 16) || '...' as result FROM api_keys WHERE token = '${API_KEY_TOKEN}';
+SELECT '✓ API Key: ' || substr(secret, 1, 16) || '...' as result FROM api_keys WHERE secret = '${API_KEY_TOKEN}';
 EOF
 
   if [ $? -eq 0 ]; then
