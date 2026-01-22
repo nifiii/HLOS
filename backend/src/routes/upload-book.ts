@@ -118,27 +118,49 @@ router.post('/upload-book', upload.single('file'), async (req: Request, res: Res
  */
 router.post('/upload-book/parse', async (req: Request, res: Response) => {
   try {
+    console.log('========================================');
+    console.log('收到 /api/upload-book/parse 请求');
+    console.log('请求体:', req.body);
+
     const { filePath, fileName } = req.body;
 
     if (!filePath || !fileName) {
+      console.error('❌ 缺少必要参数');
       return res.status(400).json({
         success: false,
         error: '缺少必要参数',
       });
     }
 
-    // 安全检查：确保 filePath 在 uploads 目录内
+    console.log('✓ 参数验证通过');
+    console.log('文件路径:', filePath);
+    console.log('文件名:', fileName);
+
+    // 安全检查：确保 filePath 在 data/originals/books 目录内
     const safePath = path.normalize(filePath);
     const fullPath = path.join(process.cwd(), safePath);
 
-    if (!fullPath.startsWith(path.join(process.cwd(), 'uploads'))) {
+    console.log('规范化路径:', safePath);
+    console.log('完整路径:', fullPath);
+
+    const allowedPaths = [
+      path.join(process.cwd(), 'uploads'),
+      path.join(process.cwd(), 'data', 'originals', 'books')
+    ];
+
+    const isAllowed = allowedPaths.some(allowedPath => fullPath.startsWith(allowedPath));
+
+    if (!isAllowed) {
+      console.error('❌ 非法的文件路径');
+      console.error('允许的路径前缀:', allowedPaths);
       return res.status(400).json({
         success: false,
         error: '非法的文件路径',
       });
     }
 
-    console.log(`开始提取元数据: ${fileName}`);
+    console.log('✓ 路径安全检查通过');
+    console.log('开始提取元数据:', fileName);
 
     // 读取文件
     const fileBuffer = await fs.readFile(fullPath);
