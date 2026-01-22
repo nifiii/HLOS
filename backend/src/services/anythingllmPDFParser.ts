@@ -100,7 +100,10 @@ ${firstPagesText}
       throw new Error(`AnythingLLM API 错误: ${chatResponse.statusText} - ${errorText}`);
     }
 
-    const chatData = await chatResponse.json();
+    const chatData = await chatResponse.json() as {
+      textResponse?: string;
+      response?: string;
+    };
     console.log('AnythingLLM 原始响应:', JSON.stringify(chatData).substring(0, 500));
 
     // 提取文本响应
