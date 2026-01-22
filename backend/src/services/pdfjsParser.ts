@@ -1,4 +1,5 @@
-import { getDocument, GlobalWorkerOptions, version } from 'pdfjs-dist';
+import pkg from 'pdfjs-dist';
+const { getDocument, GlobalWorkerOptions, version } = pkg;
 import { PageExtractionResult, CoverImageResult } from '../types/pdf.js';
 import path from 'path';
 
@@ -6,7 +7,7 @@ import path from 'path';
 console.log(`pdfjs-dist 版本: ${version}`);
 
 // 配置 worker (pdfjs-dist v3+ 需要手动配置 worker)
-// 使用绝对路径指向 worker 文件
+// 使用绝对路径指向 worker ��件
 const workerPath = path.join(
   process.cwd(),
   'node_modules',
