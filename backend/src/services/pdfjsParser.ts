@@ -35,8 +35,12 @@ export async function extractFirstPages(
     console.log('请求提取页数:', pageCount);
     console.log('PDF Buffer 大小:', buffer.length, 'bytes');
 
+    // 将 Node.js Buffer 转换为 Uint8Array（pdfjs-dist 要求）
+    const uint8ArrayData = new Uint8Array(buffer);
+    console.log('✓ Buffer 已转换为 Uint8Array');
+
     // 加载 PDF 文档
-    const loadingTask = getDocument({ data: buffer });
+    const loadingTask = getDocument({ data: uint8ArrayData });
     const pdfDocument = await loadingTask.promise;
 
     const totalPages = pdfDocument.numPages;
@@ -98,7 +102,8 @@ export async function extractFirstPages(
  */
 export async function extractCoverImage(buffer: Buffer): Promise<CoverImageResult | null> {
   try {
-    const loadingTask = getDocument({ data: buffer });
+    const uint8ArrayData = new Uint8Array(buffer);
+    const loadingTask = getDocument({ data: uint8ArrayData });
     const pdfDocument = await loadingTask.promise;
 
     const page = await pdfDocument.getPage(1);
@@ -131,7 +136,8 @@ export async function extractCoverImage(buffer: Buffer): Promise<CoverImageResul
  */
 export async function getPDFPageCount(buffer: Buffer): Promise<number> {
   try {
-    const loadingTask = getDocument({ data: buffer });
+    const uint8ArrayData = new Uint8Array(buffer);
+    const loadingTask = getDocument({ data: uint8ArrayData });
     const pdfDocument = await loadingTask.promise;
     return pdfDocument.numPages;
   } catch (error) {
