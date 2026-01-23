@@ -77,7 +77,12 @@
       "Bash(git -C \"D:\\\\devops\\\\HL-os\" commit -m \"docs: update README and PROJECT_OVERVIEW for chunked upload feature\")",
       "Bash(git -C \"D:\\\\devops\\\\HL-os\" ls -la docs/)",
       "Bash(wc:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(ssh:*)",
+      "Bash(1 \")",
+      "Bash(scp:*)",
+      "Bash(openssl:*)",
+      "Bash(python3 -m json.tool:*)"
     ]
   }
 }
