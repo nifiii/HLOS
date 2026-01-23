@@ -65,6 +65,7 @@ export const BookMetadataModal: React.FC<BookMetadataModalProps> = ({
   };
 
   const getFieldConfidenceLevel = (field: keyof BookMetadata) => {
+    if (field === 'notes') return 'none';  // notes 字段没有置信度
     const score = confidence.fields[field];
     if (!score) return 'none';
     if (score >= 0.8) return 'high';
@@ -116,7 +117,7 @@ export const BookMetadataModal: React.FC<BookMetadataModalProps> = ({
               {Object.entries(initialMetadata).map(([key, value]) => {
                 if (key === 'notes') return null;
 
-                const fieldKey = key as keyof BookMetadata;
+                const fieldKey = key as keyof Exclude<typeof initialMetadata, 'notes'>;
                 const fieldLabel = {
                   title: '书名',
                   author: '作者',
@@ -127,7 +128,7 @@ export const BookMetadataModal: React.FC<BookMetadataModalProps> = ({
                   publishDate: '出版时间'
                 }[key];
 
-                const fieldScore = confidence.fields[fieldKey];
+                const fieldScore = confidence.fields[fieldKey as keyof typeof confidence.fields];
 
                 return (
                   <div

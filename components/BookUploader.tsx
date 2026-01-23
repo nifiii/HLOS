@@ -36,6 +36,39 @@ interface UploadResult {
   extractionMethod?: string;
 }
 
+// 扩展 ChunkedUploadResult 以支持置信度
+interface ExtendedChunkedUploadResult extends Omit<ChunkedUploadResult, 'metadata'> {
+  metadata?: {
+    title: string;
+    author?: string;
+    subject: string;
+    category: string;
+    grade: string;
+    tags: string[];
+    tableOfContents?: any[];
+    notes?: string;
+    fileName?: string;
+    fileFormat?: 'pdf' | 'epub' | 'txt';
+    fileSize?: number;
+    pageCount?: number;
+    publisher?: string;
+    publishDate?: string;
+  };
+  confidence?: {
+    overall: number;
+    fields: {
+      title?: number;
+      author?: number;
+      subject?: number;
+      grade?: number;
+      category?: number;
+      publisher?: number;
+      publishDate?: number;
+    };
+  };
+  extractionMethod?: string;
+}
+
 interface BookUploaderProps {
   onUploadSuccess: (uploadResult: UploadResult) => void;
   ownerId: string;
@@ -46,7 +79,7 @@ export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, own
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadResult, setUploadResult] = useState<ChunkedUploadResult | null>(null);
+  const [uploadResult, setUploadResult] = useState<ExtendedChunkedUploadResult | null>(null);
   const [showEditor, setShowEditor] = useState(false);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
