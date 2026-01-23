@@ -68,6 +68,17 @@ const LibraryHub: React.FC<LibraryHubProps> = ({ currentUserId }) => {
     setViewMode('edit');
   };
 
+  // 处理元数据确认完成（BookMetadataModal 保存后）
+  const handleMetadataConfirmed = async () => {
+    // 刷新图书列表
+    await loadBooks();
+    // 跳转到浏览页面
+    setViewMode('grid');
+    // 清理编辑状态
+    setEditingBook(null);
+    setPendingUpload(null);
+  };
+
   // 保存图书元数据
   const handleSaveMetadata = async (metadata: Partial<EBook>) => {
     try {
@@ -304,7 +315,11 @@ const LibraryHub: React.FC<LibraryHubProps> = ({ currentUserId }) => {
           >
             ← 返回图书馆
           </Button>
-          <BookUploader onUploadSuccess={handleUploadSuccess} ownerId={currentUserId} />
+          <BookUploader
+            onUploadSuccess={handleUploadSuccess}
+            onMetadataConfirmed={handleMetadataConfirmed}
+            ownerId={currentUserId}
+          />
         </div>
       )}
       {viewMode === 'edit' && editingBook && (

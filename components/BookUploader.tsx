@@ -71,10 +71,11 @@ interface ExtendedChunkedUploadResult extends Omit<ChunkedUploadResult, 'metadat
 
 interface BookUploaderProps {
   onUploadSuccess: (uploadResult: UploadResult) => void;
+  onMetadataConfirmed: () => void;
   ownerId: string;
 }
 
-export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, ownerId }) => {
+export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, onMetadataConfirmed, ownerId }) => {
   const { uploadProgress, isUploading, uploadFile, resetProgress } = useChunkedUpload();
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState(false);
@@ -196,7 +197,8 @@ export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, own
       }
     };
 
-    onUploadSuccess(finalResult);
+    // 元数据已确认，通知父组件刷新列表并跳转到浏览页面
+    onMetadataConfirmed();
     setShowEditor(false);
 
     // 重置表单
