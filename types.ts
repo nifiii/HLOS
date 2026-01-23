@@ -89,6 +89,21 @@ export interface EBook {
   category: string;  // 教材/教辅/竞赛资料/考试真题
   grade: string;  // 小学/初中/高中
   tags: string[];  // ['奥数', '几何', '代数']
+  publisher?: string;  // 出版社
+  publishDate?: string;  // 出版时间
+
+  // AI 提取相关字段
+  aiConfidence?: number;  // 整体置信度 (0-1)
+  fieldConfidence?: {  // 字段级置信度
+    title?: number;
+    author?: number;
+    subject?: number;
+    grade?: number;
+    category?: number;
+    publisher?: number;
+    publishDate?: number;
+  };
+  extractionMethod?: 'gemini' | 'anythingllm' | 'manual';  // 提取方式
 
   // 章节目录（AI提取）
   tableOfContents: ChapterNode[];
