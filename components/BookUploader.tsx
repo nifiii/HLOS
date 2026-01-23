@@ -145,10 +145,8 @@ export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, own
             extractionMethod: parseData.data.extractionMethod
           });
 
-          // 显示编辑器
-          setTimeout(() => {
-            setShowEditor(true);
-          }, 500);
+          // 直接显示编辑器，不延迟
+          setShowEditor(true);
         } else {
           throw new Error('解析失败');
         }
@@ -253,13 +251,7 @@ export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, own
           />
         )}
 
-        {/* 成功提示 */}
-        {success && !showEditor && (
-          <div className="flex items-center gap-3 p-4 bg-green-50 rounded-lg border border-green-200">
-            <CheckCircle className="w-5 h-5 text-green-600" />
-            <span className="text-sm text-green-800">上传成功！AI 正在分析图书信息...</span>
-          </div>
-        )}
+        {/* 成功提示 - 移除，直接显示编辑器 */}
 
         {/* 错误提示 */}
         {error && (
@@ -281,8 +273,8 @@ export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, own
         </div>
       </div>
 
-      {/* 图书元数据确认��态框 */}
-      {showEditor && uploadResult?.metadata && uploadResult.confidence && (
+      {/* 图书元数据确认态框 */}
+      {showEditor && uploadResult?.metadata && (
         <BookMetadataModal
           fileName={uploadResult.metadata.fileName || selectedFile?.name || ''}
           initialMetadata={{
@@ -295,7 +287,7 @@ export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, own
             publishDate: uploadResult.metadata.publishDate || '',
             notes: uploadResult.metadata.notes || ''
           }}
-          confidence={uploadResult.confidence}
+          confidence={uploadResult.confidence || { overall: 0, fields: {} }}
           onSave={(metadata) => {
             handleSaveMetadata({
               ...uploadResult.metadata,

@@ -153,19 +153,38 @@ export async function extractMetadataFromFileName(
       throw new Error('Gemini 返回空响应');
     }
 
-    const result = JSON.parse(response.text) as ExtractionResult;
+    // Gemini 返回的 JSON 结构是扁平的（title, author 等），需要包装成 ExtractionResult 格式
+    const parsed = JSON.parse(response.text);
 
     console.log('========================================');
     console.log('✓ Gemini 元数据提取成功');
-    console.log('书名:', result.metadata.title);
-    console.log('作者:', result.metadata.author);
-    console.log('学科:', result.metadata.subject);
-    console.log('年级:', result.metadata.grade);
-    console.log('类型:', result.metadata.category);
-    console.log('出版社:', result.metadata.publisher);
-    console.log('出版时间:', result.metadata.publishDate);
-    console.log('整体置信度:', result.confidence.overall);
+    console.log('原始响应:', JSON.stringify(parsed, null, 2));
+    console.log('书名:', parsed.title);
+    console.log('作者:', parsed.author);
+    console.log('学科:', parsed.subject);
+    console.log('年级:', parsed.grade);
+    console.log('类型:', parsed.category);
+    console.log('出版社:', parsed.publisher);
+    console.log('出版时间:', parsed.publishDate);
+    console.log('整体置信度:', parsed.confidence?.overall);
     console.log('========================================');
+
+    // 包装成正确的 ExtractionResult 结构
+    const result: ExtractionResult = {
+      metadata: {
+        title: parsed.title || '',
+        author: parsed.author || '',
+        subject: parsed.subject || '其他',
+        grade: parsed.grade || '',
+        category: parsed.category || '教科书',
+        publisher: parsed.publisher || '',
+        publishDate: parsed.publishDate || ''
+      },
+      confidence: parsed.confidence || {
+        overall: 0,
+        fields: {}
+      }
+    };
 
     return result;
   } catch (error) {

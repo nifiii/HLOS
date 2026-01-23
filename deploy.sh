@@ -66,22 +66,6 @@ if [ "$INSTALL_DEPS" = true ]; then
             yum install -y nginx
         fi
 
-        # 安装 Docker
-        if ! command -v docker &> /dev/null; then
-            echo "   📥 安装 Docker..."
-            curl -fsSL https://get.docker.com | bash
-            systemctl enable docker
-            systemctl start docker
-        fi
-
-        # 安装 Docker Compose
-        if ! command -v docker-compose &> /dev/null; then
-            echo "   📥 安装 Docker Compose..."
-            curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" \
-              -o /usr/local/bin/docker-compose
-            chmod +x /usr/local/bin/docker-compose
-        fi
-
     elif [ -f /etc/debian_version ]; then
         # Ubuntu/Debian
         echo "   检测到 Ubuntu/Debian 系统"
@@ -99,22 +83,6 @@ if [ "$INSTALL_DEPS" = true ]; then
         if ! command -v nginx &> /dev/null; then
             echo "   📥 安装 Nginx..."
             apt-get install -y nginx
-        fi
-
-        # 安装 Docker
-        if ! command -v docker &> /dev/null; then
-            echo "   📥 安装 Docker..."
-            curl -fsSL https://get.docker.com | bash
-            systemctl enable docker
-            systemctl start docker
-        fi
-
-        # 安装 Docker Compose
-        if ! command -v docker-compose &> /dev/null; then
-            echo "   📥 安装 Docker Compose..."
-            curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" \
-              -o /usr/local/bin/docker-compose
-            chmod +x /usr/local/bin/docker-compose
         fi
     else
         echo -e "${RED}❌ 不支持的操作系统${NC}"
@@ -160,18 +128,6 @@ if ! command -v nginx &> /dev/null; then
     exit 1
 fi
 
-# 检查 Docker（仅用于 AnythingLLM）
-if ! command -v docker &> /dev/null; then
-    echo -e "${RED}❌ Docker 未安装${NC}"
-    echo "安装命令: ./deploy.sh --with-deps"
-    exit 1
-fi
-
-if ! command -v docker-compose &> /dev/null; then
-    echo -e "${RED}❌ Docker Compose 未安装${NC}"
-    exit 1
-fi
-
 echo -e "${GREEN}✅ 环境检查通过${NC}"
 echo ""
 
@@ -207,7 +163,6 @@ echo "📦 部署应用文件到 $INSTALL_DIR..."
 # 创建目录结构
 mkdir -p $INSTALL_DIR/{frontend,backend,logs,data,uploads}
 mkdir -p $INSTALL_DIR/data/{obsidian,originals/{images,books}}
-mkdir -p $INSTALL_DIR/{anythingllm-storage,anythingllm-hotdir}
 
 # 复制前端
 echo "   → 复制前端文件..."
@@ -342,15 +297,6 @@ server {
         proxy_request_buffering off;
     }
 
-    # AnythingLLM 代理（可选）
-    location /anythingllm/ {
-        proxy_pass http://127.0.0.1:3001/;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-    }
-
     # 健康检查端点
     location /health {
         access_log off;
@@ -376,64 +322,12 @@ echo "   ⚠️  请修改 server_name 为你的域名"
 echo ""
 
 # ================================
-# 7. 启动 AnythingLLM (Docker)
-# ================================
-echo "🐳 启动 AnythingLLM 容器..."
-
-# 读取环境变量
-source .env
-
-# 停止旧容器
-docker stop hl-anythingllm 2>/dev/null || true
-docker rm hl-anythingllm 2>/dev/null || true
-
-# 🔧 预创建数据库文件并设置权限
-echo "   → 预创建数据库文件..."
-mkdir -p $INSTALL_DIR/anythingllm-storage
-mkdir -p $INSTALL_DIR/anythingllm-hotdir
-mkdir -p $INSTALL_DIR/anythingllm-storage/comkey
-mkdir -p $INSTALL_DIR/anythingllm-storage/documents
-mkdir -p $INSTALL_DIR/anythingllm-storage/vector-cache
-touch $INSTALL_DIR/anythingllm-storage/anythingllm.db
-
-# 设置宽松权限
-echo "   → 设置存储目录权限..."
-chmod -R 777 $INSTALL_DIR/anythingllm-storage
-chmod 777 $INSTALL_DIR/anythingllm-hotdir
-
-# 启动容器 (使用 docker run 替代 docker-compose)
-echo "   → 启动容器..."
-docker run -d \
-  --name hl-anythingllm \
-  --restart unless-stopped \
-  -p 3001:3001 \
-  -v $INSTALL_DIR/anythingllm-storage:/app/server/storage \
-  -v $INSTALL_DIR/anythingllm-hotdir:/app/server/storage/hotdir \
-  -e STORAGE_DIR=/app/server/storage \
-  -e LLM_PROVIDER=gemini \
-  -e GEMINI_API_KEY=${GEMINI_API_KEY} \
-  -e EMBEDDING_ENGINE=gemini \
-  -e GEMINI_EMBEDDING_MODEL=text-embedding-004 \
-  -e VECTOR_DB=lancedb \
-  -e AUTH_TOKEN=${ANYTHINGLLM_API_KEY} \
-  -e SERVER_PORT=3001 \
-  -e CHUNK_SIZE=800 \
-  -e CHUNK_OVERLAP=150 \
-  -e MAX_CONCURRENT_CHUNKS=2 \
-  --memory="2g" \
-  --memory-reservation="1g" \
-  mintplexlabs/anythingllm:latest
-
-echo -e "${GREEN}✅ AnythingLLM 容器启动完成${NC}"
-echo ""
-
-# ================================
-# 8. 健康检查
+# 7. 健康检查
 # ================================
 echo "🏥 执行健康检查..."
 echo "--------------------------------"
 
-sleep 5
+sleep 3
 
 # 检查后端（直接访问后端端口）
 if curl -f http://127.0.0.1:3000/api/health >/dev/null 2>&1; then
@@ -458,16 +352,8 @@ else
     echo -e "${YELLOW}⚠️  Nginx 健康端点未响应${NC}"
 fi
 
-# 检查 AnythingLLM
-sleep 10
-if curl -f http://127.0.0.1:3001 >/dev/null 2>&1; then
-    echo -e "${GREEN}✅ AnythingLLM 健康检查通过${NC}"
-else
-    echo -e "${YELLOW}⚠️  AnythingLLM 仍在启动中${NC}"
-fi
-
 # ================================
-# 9. 部署总结
+# 8. 部署总结
 # ================================
 echo ""
 echo "=============================================="
@@ -477,7 +363,6 @@ echo ""
 echo "📍 服务状态:"
 echo "   前端:          $INSTALL_DIR/frontend/ (Nginx 静态服务)"
 echo "   后端:          systemd (hl-backend.service)"
-echo "   AnythingLLM:   Docker 容器"
 echo ""
 echo "📍 访问地址:"
 echo "   本地测试:      http://127.0.0.1"
@@ -490,70 +375,14 @@ echo "   后端重启:      systemctl restart hl-backend"
 echo "   后端状态:      systemctl status hl-backend"
 echo "   Nginx 重载:    systemctl reload nginx"
 echo "   Nginx 日志:    tail -f /var/log/nginx/error.log"
-echo "   AnythingLLM:   docker logs -f hl-anythingllm"
 echo ""
-echo "💾 资源占用 (混合部署优化):"
-echo "   后端 (Node.js):     ~200MB"
-echo "   AnythingLLM (容器): ~800MB"
-echo "   Nginx:              ~10MB"
-echo "   总计:               ~1GB (相比全Docker节省~500MB)"
+echo "💾 资源占用:"
+echo "   后端 (Node.js): ~200MB"
+echo "   Nginx:          ~10MB"
+echo "   总计:           ~210MB"
 echo ""
 echo "⚠️  重要提示:"
 echo "   1. 修改 /etc/nginx/conf.d/hl-os.conf 中的 server_name"
 echo "   2. 配置防火墙: firewall-cmd --add-service=http --permanent && firewall-cmd --reload"
 echo "   3. 如需HTTPS，参考: docs/SECURITY.md"
 echo ""
-
-# ================================
-# 10. 创建 AnythingLLM API Key
-# ================================
-echo "🔑 配置 AnythingLLM API Key..."
-echo "--------------------------------"
-
-# 等待 AnythingLLM 完全启动（健康检查通过后再等待）
-echo "等待 AnythingLLM 完全初始化..."
-sleep 20
-
-# 检查容器是否运行
-if ! docker ps | grep -q hl-anythingllm; then
-  echo -e "${RED}❌ AnythingLLM 容器未运行${NC}"
-  echo "请手动创建 API Key:"
-  echo "  1. 访问 http://127.0.0.1:3001"
-  echo "  2. 登录 AnythingLLM"
-  echo "  3. Settings → API Keys → Create New Key"
-  echo "  4. 复制 Key 到 /opt/.env 的 ANYTHINGLLM_API_KEY"
-  exit 1
-fi
-
-# 使用 sqlite3 直接操作数据库
-if command -v sqlite3 &> /dev/null; then
-  echo "使用 sqlite3 创建 API Key..."
-
-  API_KEY_TOKEN="${ANYTHINGLLM_API_KEY}"
-  API_KEY_TIMESTAMP=$(date +%s)
-  DB_FILE="$INSTALL_DIR/anythingllm-storage/anythingllm.db"
-
-  # 创建表并插入 API Key
-  sqlite3 "$DB_FILE" <<EOF
--- 插入 API Key（AnythingLLM 表使用 secret 列）
-INSERT INTO api_keys (secret, createdBy, createdAt)
-VALUES ('${API_KEY_TOKEN}', 1, CURRENT_TIMESTAMP);
-
--- 验证插入
-SELECT '✓ API Key: ' || substr(secret, 1, 16) || '...' as result FROM api_keys WHERE secret = '${API_KEY_TOKEN}';
-EOF
-
-  if [ $? -eq 0 ]; then
-    echo -e "${GREEN}✅ API Key 创建成功${NC}"
-    echo "   Token: ${API_KEY_TOKEN:0:16}..."
-  else
-    echo -e "${YELLOW}⚠️  sqlite3 创建失败，请手动创建${NC}"
-  fi
-else
-  echo -e "${YELLOW}⚠️  sqlite3 未安装，请手动创建 API Key${NC}"
-  echo "   安装 sqlite3: yum install -y sqlite"
-  echo "   或在 UI 中创建: http://127.0.0.1:3001"
-fi
-
-echo ""
-
