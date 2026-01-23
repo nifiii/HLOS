@@ -82,7 +82,8 @@
       "Bash(1 \")",
       "Bash(scp:*)",
       "Bash(openssl:*)",
-      "Bash(python3 -m json.tool:*)"
+      "Bash(python3 -m json.tool:*)",
+      "Bash(xargs -I {} bash -c \"scp {} root@47.79.4.52:/opt/hl-os/frontend/dist/assets/\")"
     ]
   }
 }
