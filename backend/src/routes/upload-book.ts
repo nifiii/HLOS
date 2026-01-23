@@ -5,7 +5,7 @@ import fs from 'fs/promises';
 import { extractPDFMetadata, parsePDF } from '../services/pdfParser.js';
 import { parseEPUB } from '../services/epubParser.js';
 import { analyzeBookMetadata } from '../services/bookMetadataAnalyzer.js';
-import { extractBookMetadataWithAnythingLLM } from '../services/anythingllmPDFParser.js';
+import { extractMetadataFromFileName } from '../services/geminiMetadataExtractor.js';
 
 const router = express.Router();
 
@@ -178,11 +178,11 @@ router.post('/upload-book/parse', async (req: Request, res: Response) => {
           console.log('文件路径:', fullPath);
           console.log('========================================');
 
-          // 直接使用 AnythingLLM 处理 PDF，不使用 Node.js 解析
-          console.log('调用 AnythingLLM 处理 PDF 并提取元数据...');
-          const aiMetadata = await extractBookMetadataWithAnythingLLM(fullPath, fileName);
+          // 使用 Gemini 提取元数据（基于文件名）
+          console.log('调用 Gemini 提取元数据...');
+          const extractionResult = await extractMetadataFromFileName(fileName);
 
-          // 获取页数（使用简单方法，避免 pdf-parse 的错误）
+          // 获取总页数
           try {
             pageCount = await extractPDFMetadata(fileBuffer).then(r => r.pageCount).catch(() => 0);
           } catch {
@@ -192,20 +192,22 @@ router.post('/upload-book/parse', async (req: Request, res: Response) => {
           console.log('========================================');
           console.log('✓ PDF 处理成功');
           console.log('总页数:', pageCount || '未知');
-          console.log('AI 提取的元数据:', JSON.stringify(aiMetadata));
+          console.log('AI 提取的元数据:', JSON.stringify(extractionResult.metadata));
+          console.log('整体置信度:', extractionResult.confidence.overall);
           console.log('========================================');
 
           basicMetadata = {
-            title: aiMetadata.title,
-            author: aiMetadata.author,
-            subject: aiMetadata.subject,
-            grade: aiMetadata.grade,
-            category: aiMetadata.category,
-            publisher: aiMetadata.publisher,
-            publishDate: aiMetadata.publishDate,
+            title: extractionResult.metadata.title,
+            author: extractionResult.metadata.author,
+            subject: extractionResult.metadata.subject,
+            grade: extractionResult.metadata.grade,
+            category: extractionResult.metadata.category,
+            publisher: extractionResult.metadata.publisher,
+            publishDate: extractionResult.metadata.publishDate,
             coverImage: null,
             coverFormat: 'png',
-            aiConfidence: aiMetadata.confidence,
+            aiConfidence: extractionResult.confidence.overall,
+            fieldConfidence: extractionResult.confidence.fields,
           };
           break;
 
@@ -264,7 +266,7 @@ router.post('/upload-book/parse', async (req: Request, res: Response) => {
 
       console.log('返回的元数据:', finalMetadata);
 
-      // 返回元数据（不调用 AI）
+      // 返回元数据（包含置信度）
       return res.json({
         success: true,
         data: {
@@ -273,6 +275,11 @@ router.post('/upload-book/parse', async (req: Request, res: Response) => {
           fileSize: fileBuffer.length,
           pageCount: pageCount,
           metadata: finalMetadata,
+          confidence: {
+            overall: basicMetadata.aiConfidence || 0,
+            fields: basicMetadata.fieldConfidence || {}
+          },
+          extractionMethod: 'gemini'
         },
       });
     } catch (parseError) {
