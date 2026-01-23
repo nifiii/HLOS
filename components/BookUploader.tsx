@@ -3,7 +3,7 @@ import { Upload, FileText, Loader2, CheckCircle, AlertCircle } from 'lucide-reac
 import { EBook, IndexStatus } from '../types';
 import { useChunkedUpload, ChunkedUploadResult } from '../hooks/useChunkedUpload';
 import UploadProgressBar from './UploadProgressBar';
-import BookEditor from './BookEditor';
+import BookMetadataModal from './BookMetadataModal';
 
 interface UploadResult {
   fileName: string;
@@ -19,7 +19,21 @@ interface UploadResult {
     grade: string;
     tags: string[];
     tableOfContents: any[];
+    notes?: string;
   };
+  confidence?: {
+    overall: number;
+    fields: {
+      title?: number;
+      author?: number;
+      subject?: number;
+      grade?: number;
+      category?: number;
+      publisher?: number;
+      publishDate?: number;
+    };
+  };
+  extractionMethod?: string;
 }
 
 interface BookUploaderProps {
@@ -84,7 +98,7 @@ export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, own
           const parseData = await parseResponse.json();
           console.log('✅ 图书元数据提取成功:', parseData.data);
 
-          // 更新 uploadResult，包含解析后的元数据
+          // 更新 uploadResult，包含解析后的元数据和置信度
           setUploadResult({
             ...result,
             metadata: {
@@ -93,7 +107,9 @@ export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, own
               fileFormat: parseData.data.fileFormat,
               fileSize: parseData.data.fileSize,
               pageCount: parseData.data.pageCount,
-            }
+            },
+            confidence: parseData.data.confidence,
+            extractionMethod: parseData.data.extractionMethod
           });
 
           // 显示编辑器
@@ -232,13 +248,33 @@ export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, own
         </div>
       </div>
 
-      {/* 图书信息编辑器 */}
-      {showEditor && uploadResult?.metadata && (
-        <BookEditor
-          metadata={uploadResult.metadata}
-          onSave={handleSaveMetadata}
-          onCancel={() => setShowEditor(false)}
-          userName={ownerId}  // 传递用户名作为默认标签
+      {/* 图书元数据确认��态框 */}
+      {showEditor && uploadResult?.metadata && uploadResult.confidence && (
+        <BookMetadataModal
+          fileName={uploadResult.metadata.fileName || selectedFile?.name || ''}
+          initialMetadata={{
+            title: uploadResult.metadata.title || '',
+            author: uploadResult.metadata.author || '',
+            subject: uploadResult.metadata.subject || '',
+            grade: uploadResult.metadata.grade || '',
+            category: uploadResult.metadata.category || '',
+            publisher: uploadResult.metadata.publisher || '',
+            publishDate: uploadResult.metadata.publishDate || '',
+            notes: uploadResult.metadata.notes || ''
+          }}
+          confidence={uploadResult.confidence}
+          onSave={(metadata) => {
+            handleSaveMetadata({
+              ...uploadResult.metadata,
+              ...metadata
+            });
+          }}
+          onCancel={() => {
+            setShowEditor(false);
+            setUploadResult(null);
+            setSelectedFile(null);
+            resetProgress();
+          }}
         />
       )}
     </div>
