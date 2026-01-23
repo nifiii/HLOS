@@ -182,12 +182,9 @@ router.post('/upload-book/parse', async (req: Request, res: Response) => {
           console.log('调用 Gemini 提取元数据...');
           const extractionResult = await extractMetadataFromFileName(fileName);
 
-          // 获取总页数
-          try {
-            pageCount = await extractPDFMetadata(fileBuffer).then(r => r.pageCount).catch(() => 0);
-          } catch {
-            pageCount = 0;
-          }
+          // 注意：暂不获取页数（pdf-parse 库存在兼容性问题）
+          // pageCount = await extractPDFMetadata(fileBuffer).then(r => r.pageCount).catch(() => 0);
+          pageCount = 0;
 
           console.log('========================================');
           console.log('✓ PDF 处理成功');
