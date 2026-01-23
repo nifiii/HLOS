@@ -39,13 +39,13 @@ cat /opt/.env | grep GEMINI
 ```
 
 预期输出：
-- `.env.local`：`GEMINI_API_KEY=AIzaSyDMbaPlB3JeA3bQ7kltZoxkV9XruDOCndI`
+- `.env.local`：`GEMINI_API_KEY=AIzaSyDMbaPlB3JeA`
 - `/opt/.env`：包含 `GEMINI_API_KEY`
 
 **步骤 3：确认 Gemini API Key 有效性**
 
 ```bash
-curl https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=AIzaSyDMbaPlB3JeA3bQ7kltZoxkV9XruDOCndI \
+curl https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=AIzaSyDMbaPlB \
   -H 'Content-Type: application/json' \
   -d '{"contents":[{"parts":[{"text":"test"}]}]}'
 ```
