@@ -1,16 +1,9 @@
-import pdfParse from 'pdf-parse';
+import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
 import { ChapterNode } from '../types';
 
-interface PDFParseResult {
-  text: string;
-  numpages: number;
-  metadata: {
-    title?: string;
-    author?: string;
-    subject?: string;
-    creator?: string;
-  };
-}
+// 配置 PDF.js worker
+// 在 Node 环境下使用 standard worker
+GlobalWorkerOptions.workerSrc = 'pdfjs-dist/build/pdf.worker.js';
 
 export interface BookParseResult {
   content: string;
@@ -37,15 +30,23 @@ export async function extractPDFMetadata(buffer: Buffer): Promise<{
   };
 }> {
   try {
-    const data: PDFParseResult = await pdfParse(buffer);
+    const uint8ArrayData = new Uint8Array(buffer);
+    const loadingTask = getDocument({
+      data: uint8ArrayData,
+      useSystemFonts: true,
+      disableFontFace: true,
+    });
+    
+    const pdfDocument = await loadingTask.promise;
+    const metadata = await pdfDocument.getMetadata().catch(() => ({ info: {} }));
+    const info = (metadata.info as any) || {};
 
-    // 只返回元数据和页数，不返回文本内容
     return {
-      pageCount: data.numpages,
+      pageCount: pdfDocument.numPages,
       estimatedMetadata: {
-        title: data.metadata.title,
-        author: data.metadata.author,
-        subject: data.metadata.subject,
+        title: info.Title || info.title,
+        author: info.Author || info.author,
+        subject: info.Subject || info.subject,
       },
     };
   } catch (error) {
@@ -62,21 +63,58 @@ export async function extractPDFMetadata(buffer: Buffer): Promise<{
  */
 export async function parsePDF(buffer: Buffer): Promise<BookParseResult> {
   try {
-    const data: PDFParseResult = await pdfParse(buffer);
+    const uint8ArrayData = new Uint8Array(buffer);
+    const loadingTask = getDocument({
+      data: uint8ArrayData,
+      useSystemFonts: true,
+      disableFontFace: true,
+    });
 
-    // 提取 PDF 元数据
+    const pdfDocument = await loadingTask.promise;
+    const numPages = pdfDocument.numPages;
+    const fullTextParts: string[] = [];
+
+    // 并行提取每一页的文本（为了性能，可以分批处理）
+    // 这里简单实现串行提取，确保顺序正确
+    for (let i = 1; i <= numPages; i++) {
+      try {
+        const page = await pdfDocument.getPage(i);
+        const textContent = await page.getTextContent();
+        
+        // 拼接页面文本
+        // 简单策略：将所有 item.str 用空格连接，或者根据坐标判断换行
+        // 这里使用简单的拼接，每页之间加换行
+        const pageText = textContent.items
+          .map((item: any) => item.str)
+          .join(' '); // 单词间空格
+          
+        // 过滤空白页
+        if (pageText.trim().length > 0) {
+          fullTextParts.push(pageText);
+        }
+      } catch (pageError) {
+        console.warn(`第 ${i} 页解析失败，跳过:`, pageError);
+      }
+    }
+
+    const fullText = fullTextParts.join('\n\n'); // 页间换行
+
+    // 提取元数据
+    const metadata = await pdfDocument.getMetadata().catch(() => ({ info: {} }));
+    const info = (metadata.info as any) || {};
+    
     const estimatedMetadata = {
-      title: data.metadata.title,
-      author: data.metadata.author,
-      subject: data.metadata.subject,
+      title: info.Title || info.title,
+      author: info.Author || info.author,
+      subject: info.Subject || info.subject,
     };
 
     // 从文本中提取章节目录
-    const tableOfContents = extractTableOfContents(data.text);
+    const tableOfContents = extractTableOfContents(fullText);
 
     return {
-      content: data.text,
-      pageCount: data.numpages,
+      content: fullText,
+      pageCount: numPages,
       estimatedMetadata,
       tableOfContents,
     };
@@ -107,6 +145,9 @@ function extractTableOfContents(text: string): ChapterNode[] {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
+    // 限制标题长度，避免误判长段落
+    if (line.length > 50) continue;
+
     const match = line.match(chapterRegex);
 
     if (match) {
