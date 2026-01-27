@@ -1,8 +1,10 @@
-import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
+import pdfjsLib from 'pdfjs-dist';
 import { ChapterNode } from '../types';
 
 // 配置 PDF.js worker
 // 在 Node 环境下使用 standard worker
+// 注意：pdfjs-dist 是 CommonJS 模块，需要通过 default 导出解构
+const { getDocument, GlobalWorkerOptions } = pdfjsLib;
 GlobalWorkerOptions.workerSrc = 'pdfjs-dist/build/pdf.worker.js';
 
 export interface BookParseResult {
