@@ -163,7 +163,7 @@
 #### AI & 向量数据库
 - **LLM**: 
   - Google Gemini 3 (Flash + Pro) - 视觉识别与复杂推理
-  - Doubao (Doubao-pro-1.5) - 中文长文本处理与 Markdown 转换
+  - Doubao (doubao-seed-1-8-251228) - 中文长文本处理与 Markdown 转换
 - **向量化引擎**: Gemini Embedding (`text-embedding-004`)
 - **RAG 平台**: AnythingLLM (开源)
 - **向量存储**: LanceDB

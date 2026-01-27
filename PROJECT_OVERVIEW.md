@@ -282,12 +282,16 @@
 - Google GenAI SDK (`@google/genai`)
 - Gemini 3 Flash Preview（视觉识别）
 - Gemini 3 Pro Preview（推理生成）
+- Doubao-1.5-pro（中文图书解析）
 - Gemini Embedding 004（向量化）
 
 **文件处理**：
 - `pdf-parse`：PDF 解析
 - `epub2`：EPUB 解析
-- `multer`：文件上传
+- `multer`：文件上传（内存存储，10MB限制）
+- **✅ 分片上传**：自定义实现，5MB分片，自动合并
+- **✅ 豆包 (Doubao) 集成**：中文图书元数据提取与 Markdown 转换
+- **✅ 封面提取**：`pdf-img-convert` 纯 Node.js 方案
 
 **日志**：
 - Winston 3.11
@@ -308,11 +312,13 @@
 - `Wrong_Problems/`：错题本 Markdown
 - `No_Problems/`：试卷作业 Markdown
 - `Courses/`：课件测验 Markdown
+- `Books/`：电子书全文 Markdown
 - 格式：标准 Markdown + YAML Frontmatter
 
 **层级 3：原始文件目录（`/opt/hl-os/data/originals/`）**
 - `images/{year}/{month}/`：原始图片（按月归档）
 - `books/{ownerId}/`：电子教材 PDF/EPUB
+- `covers/`：图书封面缩略图
 - 资源占用：~2.5GB（1000份文档 + 100个PDF教材）
 
 ### 3.5 部署架构
