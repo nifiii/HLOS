@@ -83,7 +83,15 @@
       "Bash(scp:*)",
       "Bash(openssl:*)",
       "Bash(python3 -m json.tool:*)",
-      "Bash(xargs -I {} bash -c \"scp {} root@47.79.4.52:/opt/hl-os/frontend/dist/assets/\")"
+      "Bash(xargs -I {} bash -c \"scp {} root@47.79.4.52:/opt/hl-os/frontend/dist/assets/\")",
+      "Bash(docker build:*)",
+      "Bash(npx vite build:*)",
+      "Bash(git stash:*)",
+      "Bash(git rm:*)",
+      "Bash(npx tsx:*)",
+      "Bash(tar:*)",
+      "Bash(pip install:*)",
+      "Bash(python:*)"
     ]
   }
 }

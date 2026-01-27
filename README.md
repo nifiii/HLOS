@@ -138,6 +138,8 @@
   - `epub2` - EPUB 解析
   - `multer` - 文件上传（内存存储，10MB限制）
   - **✅ 分片上传**: 自定义实现，5MB分片，自动合并
+  - **✅ 豆包 (Doubao) 集成**: 使用字节跳动豆包大模型进行 PDF 元数据分析和 Markdown 转换
+  - **✅ 封面提取**: 使用 `pdf-img-convert` 本地生成 PDF 缩略图 (无 Python 依赖)
 - **文件清理**: 定时清理过期临时文件（24小时保留期）
 - **日志**: Winston
 
@@ -150,14 +152,18 @@
   - `Wrong_Problems/` - 错题本 Markdown
   - `No_Problems/` - 试卷作业 Markdown
   - `Courses/` - 课件测验 Markdown
+  - `Books/` - 电子书 Markdown (由豆包 AI 生成)
 - **层级3**: 原始文件目录 (`/opt/hl-os/data/originals/`)
   - `images/` - 原始图片（按月归档）
   - `books/` - 电子教材 PDF/EPUB
+  - `covers/` - 图书封面图片
 
 **资源占用**: ~2.5GB（1000份文档 + 100个PDF教材）
 
 #### AI & 向量数据库
-- **LLM**: Google Gemini 3 (Flash + Pro)
+- **LLM**: 
+  - Google Gemini 3 (Flash + Pro) - 视觉识别与复杂推理
+  - Doubao (Doubao-pro-1.5) - 中文长文本处理与 Markdown 转换
 - **向量化引擎**: Gemini Embedding (`text-embedding-004`)
 - **RAG 平台**: AnythingLLM (开源)
 - **向量存储**: LanceDB

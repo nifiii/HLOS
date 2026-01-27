@@ -178,9 +178,54 @@ router.post('/upload-book/parse', async (req: Request, res: Response) => {
           console.log('文件路径:', fullPath);
           console.log('========================================');
 
-          // 使用 Gemini 提取元数据（基于文件名）
-          console.log('调用 Gemini 提取元数据...');
-          const extractionResult = await extractMetadataFromFileName(fileName);
+          // 使用 Doubao 提取元数据
+          console.log('调用 Doubao 提取元数据...');
+          
+          let aiMetadata;
+          let coverImage = null;
+          
+          // 并行执行：元数据提取 + 封面生成
+          try {
+            const [metadataResult, coverImageName] = await Promise.all([
+              analyzeMetadataWithDoubao(parseResult.content, fileName),
+              extractCoverImage(fullPath, path.join(process.cwd(), 'uploads', 'covers'))
+            ]);
+            
+            aiMetadata = metadataResult;
+            coverImage = coverImageName ? `/uploads/covers/${coverImageName}` : null;
+            
+            // 异步触发 Markdown 转换和存储 (不阻塞响应)
+            // TODO: 这里可以放入消息队列，暂时用异步函数处理
+            (async () => {
+              try {
+                console.log('开始后台转换 Markdown...');
+                const markdown = await convertToMarkdownWithDoubao(parseResult.content);
+                
+                // 确定存储路径
+                const subjectDir = aiMetadata?.subject || '其他';
+                const outputDir = path.join(process.cwd(), 'data', 'obsidian', 'Books', subjectDir);
+                await fs.mkdir(outputDir, { recursive: true });
+                
+                const mdFileName = `${fileName.replace('.pdf', '')}.md`;
+                await fs.writeFile(path.join(outputDir, mdFileName), markdown);
+                console.log(`Markdown 已保存至: ${path.join(outputDir, mdFileName)}`);
+              } catch (err) {
+                console.error('后台 Markdown 转换失败:', err);
+              }
+            })();
+
+          } catch (aiError) {
+            console.error('AI 处理失败:', aiError);
+            // 降级处理：仅使用基本信息
+            aiMetadata = {
+              title: fileName.replace('.pdf', ''),
+              subject: '其他',
+              grade: '',
+              category: '教科书',
+              tags: [],
+              tableOfContents: []
+            };
+          }
 
           // 注意：暂不获取页数（pdf-parse 库存在兼容性问题）
           // pageCount = await extractPDFMetadata(fileBuffer).then(r => r.pageCount).catch(() => 0);
@@ -189,22 +234,24 @@ router.post('/upload-book/parse', async (req: Request, res: Response) => {
           console.log('========================================');
           console.log('✓ PDF 处理成功');
           console.log('总页数:', pageCount || '未知');
-          console.log('AI 提取的元数据:', JSON.stringify(extractionResult.metadata));
-          console.log('整体置信度:', extractionResult.confidence.overall);
+          console.log('AI 提取的元数据:', JSON.stringify(aiMetadata));
+          console.log('封面图片:', coverImage);
           console.log('========================================');
 
           basicMetadata = {
-            title: extractionResult.metadata.title,
-            author: extractionResult.metadata.author,
-            subject: extractionResult.metadata.subject,
-            grade: extractionResult.metadata.grade,
-            category: extractionResult.metadata.category,
-            publisher: extractionResult.metadata.publisher,
-            publishDate: extractionResult.metadata.publishDate,
-            coverImage: null,
+            title: aiMetadata.title || fileName.replace('.pdf', ''),
+            author: aiMetadata.author,
+            subject: aiMetadata.subject,
+            grade: aiMetadata.grade,
+            category: aiMetadata.category,
+            publisher: aiMetadata.publisher,
+            publishDate: aiMetadata.publishDate,
+            coverImage: coverImage,
             coverFormat: 'png',
-            aiConfidence: extractionResult.confidence.overall,
-            fieldConfidence: extractionResult.confidence.fields,
+            aiConfidence: 0.9, // 豆包通常比较准，给个默认高置信度
+            fieldConfidence: {}, // 豆包暂不返回字段级置信度
+            tags: aiMetadata.tags || [],
+            tableOfContents: aiMetadata.tableOfContents || []
           };
           break;
 

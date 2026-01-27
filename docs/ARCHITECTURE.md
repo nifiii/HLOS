@@ -51,25 +51,28 @@
 │  :3000           │                  │  :3001               │
 └─────────┬────────┘                  └──────────────────────┘
          │
+         ├───► [Doubao Service] (元数据/Markdown)
+         │
          ▼
 ┌──────────────────────────────────────────────────┐
 │     服务端文件系统 (/opt/hl-os/data/)            │
 │  ├─ obsidian/          (Obsidian Markdown)       │
 │  │  ├─ Wrong_Problems/  (错题本)                │
 │  │  ├─ No_Problems/     (试卷作业)              │
-│  │  └─ Courses/         (课件测验)              │
+│  │  ├─ Courses/         (课件测验)              │
+│  │  └─ Books/           (电子书全文)            │
 │  ├─ originals/         (原始文件)                │
 │  │  ├─ images/          (原始图片)              │
-│  │  └─ books/           (电子教材)              │
+│  │  ├─ books/           (电子教材)              │
+│  │  └─ covers/          (图书封面)              │
 │  └─ metadata.json      (元数据索引)             │
 └──────────────────────────────────────────────────┘
          │
          ▼
 ┌──────────────────────────────────────────────────┐
-│           Google Gemini API                      │
-│  - gemini-3-flash-preview (图像分析/课件)        │
-│  - gemini-3-pro-preview (试卷生成/深度推理)      │
-│  - gemini-2.5-flash-preview-exp (实时语音)       │
+│           AI Services API                        │
+│  - Google Gemini 3 (图像分析/课件/推理)           │
+│  - Doubao-1.5-pro (PDF元数据/Markdown转换)       │
 └──────────────────────────────────────────────────┘
 ```
 
@@ -131,6 +134,8 @@
 | **Express.js** | 4.21.2 | RESTful API框架 |
 | **TypeScript** | 5.7.2 | 后端类型安全 |
 | **@google/genai** | 1.37.0 | Gemini API客户端SDK |
+| **openai** | 4.x | Doubao API 客户端 (兼容层) |
+| **pdf-img-convert** | 1.x | PDF 封面提取 (无依赖) |
 | **Multer** | 1.4.5-lts.1 | 文件上传中间件 (100MB限制) |
 | **pdf-parse** | 1.1.1 | PDF文本提取 |
 | **epub2** | 3.0.2 | EPUB电子书解析 |
@@ -141,7 +146,8 @@
 
 | 服务 | 用途 | 配置 |
 |------|------|------|
-| **Google Gemini API** | AI推理 | GEMINI_API_KEY |
+| **Google Gemini API** | 视觉识别/推理/向量化 | GEMINI_API_KEY |
+| **ByteDance Doubao API** | 中文元数据/Markdown转换 | ARK_API_KEY, ARK_MODEL_ID |
 | **AnythingLLM** | RAG向量数据库 | ANYTHINGLLM_ENDPOINT, API_KEY |
 
 ---
