@@ -65,12 +65,20 @@ export async function extractPDFMetadata(buffer: Buffer): Promise<{
  */
 export async function parsePDF(buffer: Buffer): Promise<BookParseResult> {
   try {
+    // 调试日志：打印文件头，检查是否为 PDF
+    if (buffer.length > 20) {
+      const headerHex = buffer.subarray(0, 20).toString('hex');
+      const headerStr = buffer.subarray(0, 20).toString('utf-8');
+      console.log(`[PDF Parser] 文件头校验: HEX=${headerHex}, STR=${headerStr}`);
+    }
+
     const uint8ArrayData = new Uint8Array(buffer);
     const loadingTask = getDocument({
       data: uint8ArrayData,
       useSystemFonts: true,
       disableFontFace: true,
-    });
+      ignoreErrors: true, // 忽略 PDF 结构错误，尝试尽力解析
+    } as any);
 
     const pdfDocument = await loadingTask.promise;
     const numPages = pdfDocument.numPages;

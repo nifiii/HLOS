@@ -10,7 +10,6 @@ import scannedItemsRouter from './routes/scannedItems.js';
 import saveBookRouter from './routes/saveBook.js';
 import booksRouter from './routes/books.js';
 import authRouter from './routes/auth.js';
-import uploadChunkRouter from './routes/upload-chunk.js';
 import uploadBookRouter from './routes/upload-book.js';
 import { cleanupTempChunks } from './utils/cleanup.js';
 
@@ -54,7 +53,6 @@ app.use('/api', saveScannedItemRouter);
 app.use('/api', scannedItemsRouter);
 app.use('/api', saveBookRouter);
 app.use('/api', booksRouter);
-app.use('/api', uploadChunkRouter);
 app.use('/api', uploadBookRouter);
 
 // 测试端点：验证 FormData 请求
