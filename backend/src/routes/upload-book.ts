@@ -6,6 +6,8 @@ import { extractPDFMetadata, parsePDF } from '../services/pdfParser.js';
 import { parseEPUB } from '../services/epubParser.js';
 import { analyzeBookMetadata } from '../services/bookMetadataAnalyzer.js';
 import { extractMetadataFromFileName } from '../services/geminiMetadataExtractor.js';
+import { analyzeMetadataWithDoubao, convertToMarkdownWithDoubao } from '../services/doubaoService.js';
+import { extractCoverImage } from '../services/imageService.js';
 
 const router = express.Router();
 

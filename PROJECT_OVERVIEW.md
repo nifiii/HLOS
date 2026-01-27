@@ -282,7 +282,7 @@
 - Google GenAI SDK (`@google/genai`)
 - Gemini 3 Flash Preview（视觉识别）
 - Gemini 3 Pro Preview（推理生成）
-- Doubao-1.5-pro（中文图书解析）
+- doubao-seed-1-8-251228（中文图书解析）
 - Gemini Embedding 004（向量化）
 
 **文件处理**：
