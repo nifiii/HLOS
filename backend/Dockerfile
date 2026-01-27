@@ -8,6 +8,16 @@ WORKDIR /app
 # 复制 package.json 和 package-lock.json
 COPY backend/package*.json ./
 
+# 安装构建依赖 (canvas/pdf-img-convert 需要)
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    cairo-dev \
+    jpeg-dev \
+    pango-dev \
+    giflib-dev
+
 # 安装依赖（包括 devDependencies 用于构建）
 RUN npm config set registry https://registry.npmmirror.com && \
     npm install
