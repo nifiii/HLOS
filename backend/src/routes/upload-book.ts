@@ -188,8 +188,11 @@ router.post('/upload-book/parse', async (req: Request, res: Response) => {
           
           // 并行执行：元数据提取 + 封面生成
           try {
+            // 先解析 PDF 内容（修复 parseResult 未定义的问题）
+            const pdfParseResult = await parsePDF(fileBuffer);
+            
             const [metadataResult, coverImageName] = await Promise.all([
-              analyzeMetadataWithDoubao(parseResult.content, fileName),
+              analyzeMetadataWithDoubao(pdfParseResult.content, fileName),
               extractCoverImage(fullPath, path.join(process.cwd(), 'uploads', 'covers'))
             ]);
             
@@ -201,7 +204,7 @@ router.post('/upload-book/parse', async (req: Request, res: Response) => {
             (async () => {
               try {
                 console.log('开始后台转换 Markdown...');
-                const markdown = await convertToMarkdownWithDoubao(parseResult.content);
+                const markdown = await convertToMarkdownWithDoubao(pdfParseResult.content);
                 
                 // 确定存储路径
                 const subjectDir = aiMetadata?.subject || '其他';
