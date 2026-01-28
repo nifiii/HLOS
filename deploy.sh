@@ -300,9 +300,12 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_cache_bypass $http_upgrade;
 
-        # 大文件上传
+        # 大文件上传与超时设置
         client_max_body_size 1024M;
         proxy_request_buffering off;
+        proxy_read_timeout 600s;
+        proxy_connect_timeout 600s;
+        proxy_send_timeout 600s;
     }
 
     # 数据目录 - 封面图片

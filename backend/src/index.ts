@@ -92,7 +92,7 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   });
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`✅ Backend server running on port ${PORT}`);
   console.log(`📍 Health check: http://localhost:${PORT}/api/health`);
 
@@ -104,3 +104,8 @@ app.listen(PORT, () => {
     cleanupTempChunks().catch(console.error);
   }, 60 * 60 * 1000);
 });
+
+// 设置服务器超时时间为 10 分钟 (解决大文件上传解析 408 错误)
+server.timeout = 600000;
+server.headersTimeout = 610000;
+server.keepAliveTimeout = 60000;
