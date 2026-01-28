@@ -1,11 +1,5 @@
-import pdfjsLib from 'pdfjs-dist';
+import pdfParse from 'pdf-parse';
 import { ChapterNode } from '../types';
-
-// 配置 PDF.js worker
-// 在 Node 环境下使用 standard worker
-// 注意：pdfjs-dist 是 CommonJS 模块，需要通过 default 导出解构
-const { getDocument, GlobalWorkerOptions } = pdfjsLib;
-GlobalWorkerOptions.workerSrc = 'pdfjs-dist/build/pdf.worker.js';
 
 export interface BookParseResult {
   content: string;
@@ -32,19 +26,11 @@ export async function extractPDFMetadata(buffer: Buffer): Promise<{
   };
 }> {
   try {
-    const uint8ArrayData = new Uint8Array(buffer);
-    const loadingTask = getDocument({
-      data: uint8ArrayData,
-      useSystemFonts: true,
-      disableFontFace: true,
-    });
-    
-    const pdfDocument = await loadingTask.promise;
-    const metadata = await pdfDocument.getMetadata().catch(() => ({ info: {} }));
-    const info = (metadata.info as any) || {};
+    const data = await pdfParse(buffer);
+    const info = (data.info as any) || {};
 
     return {
-      pageCount: pdfDocument.numPages,
+      pageCount: data.numpages,
       estimatedMetadata: {
         title: info.Title || info.title,
         author: info.Author || info.author,
@@ -72,47 +58,11 @@ export async function parsePDF(buffer: Buffer): Promise<BookParseResult> {
       console.log(`[PDF Parser] 文件头校验: HEX=${headerHex}, STR=${headerStr}`);
     }
 
-    const uint8ArrayData = new Uint8Array(buffer);
-    const loadingTask = getDocument({
-      data: uint8ArrayData,
-      useSystemFonts: true,
-      disableFontFace: true,
-      ignoreErrors: true, // 忽略 PDF 结构错误，尝试尽力解析
-    } as any);
+    const data = await pdfParse(buffer);
+    const fullText = data.text;
+    const numPages = data.numpages;
+    const info = (data.info as any) || {};
 
-    const pdfDocument = await loadingTask.promise;
-    const numPages = pdfDocument.numPages;
-    const fullTextParts: string[] = [];
-
-    // 并行提取每一页的文本（为了性能，可以分批处理）
-    // 这里简单实现串行提取，确保顺序正确
-    for (let i = 1; i <= numPages; i++) {
-      try {
-        const page = await pdfDocument.getPage(i);
-        const textContent = await page.getTextContent();
-        
-        // 拼接页面文本
-        // 简单策略：将所有 item.str 用空格连接，或者根据坐标判断换行
-        // 这里使用简单的拼接，每页之间加换行
-        const pageText = textContent.items
-          .map((item: any) => item.str)
-          .join(' '); // 单词间空格
-          
-        // 过滤空白页
-        if (pageText.trim().length > 0) {
-          fullTextParts.push(pageText);
-        }
-      } catch (pageError) {
-        console.warn(`第 ${i} 页解析失败，跳过:`, pageError);
-      }
-    }
-
-    const fullText = fullTextParts.join('\n\n'); // 页间换行
-
-    // 提取元数据
-    const metadata = await pdfDocument.getMetadata().catch(() => ({ info: {} }));
-    const info = (metadata.info as any) || {};
-    
     const estimatedMetadata = {
       title: info.Title || info.title,
       author: info.Author || info.author,
