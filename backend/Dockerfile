@@ -48,6 +48,9 @@ RUN npm config set registry https://registry.npmmirror.com && \
     npm install --omit=dev && \
     npm cache clean --force
 
+# 安装运行时依赖 (pdftoppm)
+RUN apk add --no-cache poppler-utils
+
 # 从构建阶段复制编译后的代码
 COPY --from=backend-builder /app/dist ./dist
 

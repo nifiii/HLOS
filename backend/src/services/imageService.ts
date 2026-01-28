@@ -1,53 +1,13 @@
-import pdfjsLib from 'pdfjs-dist';
-import { createCanvas, Canvas, Image } from 'canvas';
 import path from 'path';
 import fs from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 
-// 配置 PDF.js worker
-const { getDocument, GlobalWorkerOptions } = pdfjsLib;
-// 确保 workerSrc 已设置 (如果是第一次调用)
-if (!GlobalWorkerOptions.workerSrc) {
-  GlobalWorkerOptions.workerSrc = 'pdfjs-dist/build/pdf.worker.js';
-}
+const execAsync = promisify(exec);
 
 /**
- * NodeCanvasFactory 用于在 Node.js 环境中创建 Canvas
- * 参考: https://github.com/mozilla/pdf.js/blob/master/examples/node/pdf2png/pdf2png.js
- */
-class NodeCanvasFactory {
-  create(width: number, height: number) {
-    if (width <= 0 || height <= 0) {
-      throw new Error("Invalid canvas size");
-    }
-    const canvas = createCanvas(width, height);
-    const context = canvas.getContext("2d");
-    return {
-      canvas: canvas,
-      context: context,
-    };
-  }
-
-  reset(canvasAndContext: any, width: number, height: number) {
-    if (width <= 0 || height <= 0) {
-      throw new Error("Invalid canvas size");
-    }
-    canvasAndContext.canvas.width = width;
-    canvasAndContext.canvas.height = height;
-  }
-
-  destroy(canvasAndContext: any) {
-    if (canvasAndContext.canvas) {
-        canvasAndContext.canvas.width = 0;
-        canvasAndContext.canvas.height = 0;
-    }
-    canvasAndContext.canvas = null;
-    canvasAndContext.context = null;
-  }
-}
-
-/**
- * 提取 PDF 封面并保存为图片
+ * 提取 PDF 封面并保存为图片 (使用 pdftoppm 工具)
  * @param pdfBuffer PDF 文件 Buffer 或路径
  * @param outputDir 输出目录
  * @returns 生成的图片文件名
@@ -56,77 +16,74 @@ export async function extractCoverImage(
   pdfBuffer: Buffer | string,
   outputDir: string
 ): Promise<string> {
+  let tempPdfPath: string | null = null;
+
   try {
-    let data: Uint8Array;
+    // 1. 准备 PDF 文件路径
+    let inputPdfPath: string;
 
     if (Buffer.isBuffer(pdfBuffer)) {
-      data = new Uint8Array(pdfBuffer);
+      // 如果是 Buffer，需要先写入临时文件
+      const tempId = uuidv4();
+      tempPdfPath = path.join(outputDir, `temp-${tempId}.pdf`);
+      await fs.writeFile(tempPdfPath, pdfBuffer);
+      inputPdfPath = tempPdfPath;
     } else if (typeof pdfBuffer === 'string') {
-      const buffer = await fs.readFile(pdfBuffer);
-      data = new Uint8Array(buffer);
+      inputPdfPath = pdfBuffer;
     } else {
       throw new Error('无效的 PDF 数据');
     }
 
-    // 加载 PDF 文档
-    const loadingTask = getDocument({
-      data,
-      cMapUrl: 'pdfjs-dist/cmaps/',
-      cMapPacked: true,
-      standardFontDataUrl: 'pdfjs-dist/standard_fonts/',
-      disableFontFace: true, // 禁用字体加载，避免某些环境下的问题
-    });
-
-    const pdfDocument = await loadingTask.promise;
-    const page = await pdfDocument.getPage(1);
-
-    // 计算缩放比例 (目标宽度 600px)
-    const viewport = page.getViewport({ scale: 1.0 });
-    const targetWidth = 600;
-    const scale = targetWidth / viewport.width;
-    const scaledViewport = page.getViewport({ scale });
-
-    // 创建 Canvas
-    const canvasFactory = new NodeCanvasFactory();
-    const canvasAndContext = canvasFactory.create(
-      scaledViewport.width,
-      scaledViewport.height
-    );
-
-    // 渲染页面
-    const renderContext = {
-      canvasContext: canvasAndContext.context,
-      viewport: scaledViewport,
-      canvasFactory: canvasFactory,
-    };
-
-    await page.render(renderContext).promise;
-
-    // 保存为图片
-    const buffer = canvasAndContext.canvas.toBuffer('image/png');
-    
-    // 生成唯一文件名
-    const imageName = `cover-${uuidv4()}.png`;
-    const outputPath = path.join(outputDir, imageName);
-
-    // 确保目录存在
+    // 确保输出目录存在
     await fs.mkdir(outputDir, { recursive: true });
 
-    await fs.writeFile(outputPath, buffer);
+    // 2. 生成唯一的输出文件前缀
+    const outputPrefix = `cover-${uuidv4()}`;
+    const outputBasePath = path.join(outputDir, outputPrefix);
 
-    // 清理
-    canvasFactory.destroy(canvasAndContext);
+    // 3. 执行 pdftoppm 命令
+    // 命令: pdftoppm -jpeg -f 1 -l 1 input.pdf output_prefix
+    // 这将生成 output_prefix-1.jpg
+    const command = `pdftoppm -jpeg -f 1 -l 1 "${inputPdfPath}" "${outputBasePath}"`;
     
-    // 释放 PDF 文档资源 (如果支持 destroy 方法)
-    if (pdfDocument.destroy) {
-      pdfDocument.destroy();
+    console.log('执行封面提取命令:', command);
+    await execAsync(command);
+
+    // 4. 确定生成的文件名
+    // pdftoppm 会自动添加 -1.jpg 后缀 (因为我们指定了 -f 1 -l 1)
+    // 也就是 path.join(outputDir, `${outputPrefix}-1.jpg`)
+    const generatedFileName = `${outputPrefix}-1.jpg`;
+    const generatedFilePath = path.join(outputDir, generatedFileName);
+
+    // 检查文件是否存在
+    try {
+      await fs.access(generatedFilePath);
+    } catch (e) {
+      throw new Error(`封面生成失败，未找到预期文件: ${generatedFileName}`);
     }
 
-    return imageName;
+    // 5. 重命名为最终文件名 (去掉 -1 后缀，或者直接使用生成的文件名)
+    // 为了简洁，我们可以直接返回生成的文件名
+    // 但为了保持 uuid 的纯净性，我们重命名一下
+    const finalFileName = `${outputPrefix}.jpg`;
+    const finalFilePath = path.join(outputDir, finalFileName);
+    
+    await fs.rename(generatedFilePath, finalFilePath);
+
+    return finalFileName;
+
   } catch (error) {
     console.error('封面提取失败:', error);
-    // 不抛出错误，而是返回空字符串或 null，让上层处理降级
-    // 或者抛出错误，让上层决定
+    // 抛出错误让上层处理
     throw error;
+  } finally {
+    // 清理临时 PDF 文件 (如果是我们创建的)
+    if (tempPdfPath) {
+      try {
+        await fs.unlink(tempPdfPath);
+      } catch (e) {
+        console.warn('清理临时 PDF 文件失败:', e);
+      }
+    }
   }
 }
