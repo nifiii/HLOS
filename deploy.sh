@@ -178,6 +178,13 @@ cp -r $BUILD_DIR/backend/dist $INSTALL_DIR/backend/
 echo "   → 安装后端依赖..."
 cp backend/package*.json $INSTALL_DIR/backend/
 cd $INSTALL_DIR/backend
+
+# 启用新版编译器以支持 better-sqlite3 (针对 CentOS 8)
+if [ -f "/opt/rh/gcc-toolset-11/enable" ]; then
+  source /opt/rh/gcc-toolset-11/enable
+  echo "✓ 已启用 gcc-toolset-11"
+fi
+
 # 增加 --legacy-peer-deps 以避免版本冲突
 npm install --omit=dev --production --legacy-peer-deps 2>/dev/null || npm install --omit=dev --legacy-peer-deps
 cd - > /dev/null
