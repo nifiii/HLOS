@@ -86,7 +86,8 @@ export async function saveOriginalImage(
 
   await fs.writeFile(filePath, buffer);
 
-  return filePath;
+  // 返回相对 URL 而非磁盘绝对路径，供前端访问
+  return `/data/originals/images/${monthDir}/${fileName}`;
 }
 
 /**

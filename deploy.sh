@@ -312,11 +312,17 @@ server {
         add_header Cache-Control "public, immutable";
     }
 
-    # 数据目录 - 原始图片
-    location /data/images/ {
-        alias /opt/hl-os/data/originals/images/;
+    # 数据目录 - 统一访问
+    location /data/ {
+        alias /opt/hl-os/data/;
         expires 30d;
         add_header Cache-Control "public, immutable";
+    }
+
+    # 临时上传目录 (用于预览)
+    location /uploads/ {
+        alias /opt/hl-os/uploads/;
+        expires 1h;
     }
 
     # 健康检查端点
