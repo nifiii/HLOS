@@ -47,24 +47,25 @@ export async function extractCoverImage(
     const command = `pdftoppm -jpeg -f 1 -l 1 "${inputPdfPath}" "${outputBasePath}"`;
     
     console.log('执行封面提取命令:', command);
-    await execAsync(command);
-
-    // 4. 确定生成的文件名
-    // pdftoppm 会自动添加 -1.jpg 后缀 (因为我们指定了 -f 1 -l 1)
-    // 也就是 path.join(outputDir, `${outputPrefix}-1.jpg`)
-    const generatedFileName = `${outputPrefix}-1.jpg`;
-    const generatedFilePath = path.join(outputDir, generatedFileName);
-
-    // 检查文件是否存在
-    try {
-      await fs.access(generatedFilePath);
-    } catch (e) {
-      throw new Error(`封面生成失败，未找到预期文件: ${generatedFileName}`);
+    const { stdout, stderr } = await execAsync(command);
+    
+    if (stderr) {
+      console.warn('pdftoppm stderr:', stderr);
     }
 
-    // 5. 重命名为最终文件名 (去掉 -1 后缀，或者直接使用生成的文件名)
-    // 为了简洁，我们可以直接返回生成的文件名
-    // 但为了保持 uuid 的纯净性，我们重命名一下
+    // 4. 确定生成的文件名
+    // pdftoppm 可能会生成 -1.jpg, -01.jpg, -001.jpg 等，取决于版本和总页数
+    const files = await fs.readdir(outputDir);
+    const generatedFileName = files.find(f => f.startsWith(outputPrefix) && f.endsWith('.jpg'));
+
+    if (!generatedFileName) {
+      console.error('pdftoppm 输出目录内容:', files);
+      throw new Error(`封面生成失败，在目录 ${outputDir} 中未找到前缀为 ${outputPrefix} 的 .jpg 文件`);
+    }
+
+    const generatedFilePath = path.join(outputDir, generatedFileName);
+
+    // 5. 重命名为最终文件名 (去掉页码后缀)
     const finalFileName = `${outputPrefix}.jpg`;
     const finalFilePath = path.join(outputDir, finalFileName);
     
