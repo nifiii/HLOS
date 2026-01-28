@@ -6,7 +6,7 @@ import { extractPDFMetadata, parsePDF } from '../services/pdfParser.js';
 import { parseEPUB } from '../services/epubParser.js';
 import { analyzeBookMetadata } from '../services/bookMetadataAnalyzer.js';
 import { extractMetadataFromFileName } from '../services/geminiMetadataExtractor.js';
-import { analyzeMetadataWithDoubao, convertToMarkdownWithDoubao } from '../services/doubaoService.js';
+import { analyzeMetadata, convertToMarkdown } from '../services/llmService.js';
 import { extractCoverImage } from '../services/imageService.js';
 
 const router = express.Router();
@@ -180,8 +180,8 @@ router.post('/upload-book/parse', async (req: Request, res: Response) => {
           console.log('文件路径:', fullPath);
           console.log('========================================');
 
-          // 使用 Doubao 提取元数据
-          console.log('调用 Doubao 提取元数据...');
+          // 使用统一 LLM 服务提取元数据
+          console.log('调用 LLM 提取元数据...');
           
           let aiMetadata;
           let coverImage = null;
@@ -192,7 +192,7 @@ router.post('/upload-book/parse', async (req: Request, res: Response) => {
             const pdfParseResult = await parsePDF(fileBuffer);
             
             const [metadataResult, coverImageName] = await Promise.all([
-              analyzeMetadataWithDoubao(pdfParseResult.content, fileName),
+              analyzeMetadata(pdfParseResult.content, fileName),
               extractCoverImage(fullPath, path.join(process.cwd(), 'uploads', 'covers'))
             ]);
             
@@ -204,7 +204,7 @@ router.post('/upload-book/parse', async (req: Request, res: Response) => {
             (async () => {
               try {
                 console.log('开始后台转换 Markdown...');
-                const markdown = await convertToMarkdownWithDoubao(pdfParseResult.content);
+                const markdown = await convertToMarkdown(pdfParseResult.content);
                 
                 // 确定存储路径
                 const subjectDir = aiMetadata?.subject || '其他';
