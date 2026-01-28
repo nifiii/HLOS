@@ -44,6 +44,15 @@ WORKDIR /app
 COPY backend/package*.json ./
 
 # 仅安装生产依赖
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    cairo-dev \
+    jpeg-dev \
+    pango-dev \
+    giflib-dev
+
 RUN npm config set registry https://registry.npmmirror.com && \
     npm install --omit=dev && \
     npm cache clean --force

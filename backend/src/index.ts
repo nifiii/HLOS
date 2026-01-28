@@ -13,8 +13,12 @@ import booksRouter from './routes/books.js';
 import authRouter from './routes/auth.js';
 import uploadBookRouter from './routes/upload-book.js';
 import { cleanupTempChunks } from './utils/cleanup.js';
+import { initDatabase } from './services/databaseService.js';
 
 dotenv.config();
+
+// 初始化数据库
+initDatabase();
 
 const app = express();
 const PORT = process.env.PORT || 3000;

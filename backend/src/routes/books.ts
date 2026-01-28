@@ -48,10 +48,18 @@ router.get('/books', async (req: Request, res: Response, next: NextFunction) => 
           pageCount,
           subject: meta.subject,
           anythingLlmDocId: meta.anythingLlmDocId,
-          // 元数据（从 metadata.json 中读取）
+          status: (meta as any).status || 'completed',
+          // 元数据 (从数据库读取真实字段)
           metadata: {
-            title: `${meta.subject}教材`, // 简化处理
+            title: (meta as any).title || `${meta.subject}教材`,
+            author: (meta as any).author,
             subject: meta.subject,
+            category: (meta as any).category,
+            grade: (meta as any).grade,
+            publisher: (meta as any).publisher,
+            publishDate: (meta as any).publishDate,
+            tags: (meta as any).tags || [],
+            coverImage: meta.imagePath,
           },
         };
       })
@@ -109,10 +117,17 @@ router.get('/books/:id', async (req: Request, res: Response, next: NextFunction)
       filePath: metadata.filePath,
       fileSize,
       anythingLlmDocId: metadata.anythingLlmDocId,
+      status: (metadata as any).status || 'completed',
       metadata: {
-        title: `${metadata.subject}教材`,
+        title: (metadata as any).title || `${metadata.subject}教材`,
+        author: (metadata as any).author,
         subject: metadata.subject,
-        chapter: metadata.chapter,
+        category: (metadata as any).category,
+        grade: (metadata as any).grade,
+        publisher: (metadata as any).publisher,
+        publishDate: (metadata as any).publishDate,
+        tags: (metadata as any).tags || [],
+        coverImage: metadata.imagePath,
       },
     };
 

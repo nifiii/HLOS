@@ -36,6 +36,7 @@ router.post('/save-book', upload.none(), async (req: Request, res: Response) => 
     const { metadata, coverImage, tempFilePath, ownerId = 'shared' } = req.body;
 
     if (!metadata || !tempFilePath) {
+      console.error('[saveBook] 缺少参数:', { metadata: !!metadata, tempFilePath: !!tempFilePath });
       return res.status(400).json({
         success: false,
         error: '缺少必要参数 (metadata, tempFilePath)',
@@ -44,154 +45,148 @@ router.post('/save-book', upload.none(), async (req: Request, res: Response) => 
 
     // 解析 metadata
     const bookMetadata = typeof metadata === 'string' ? JSON.parse(metadata) : metadata;
-    const { title, subject, category, tags } = bookMetadata;
+    const { title, subject, category } = bookMetadata;
     const userName = USER_NAMES[ownerId] || '共享';
+    const bookId = `book_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    console.log(`[saveBook] 开始保存教材: ${title} (${subject})`);
+    console.log(`[saveBook] >>> 收到保存请求: ${title} (${subject}), ID: ${bookId}`);
 
-    // 1. 验证临时文件是否存在
-    // 注意：tempFilePath 应该是绝对路径或相对于项目根目录的路径
-    // 前端传递的可能是相对路径，需要处理
+    // 1. 路径修复与验证
+    // 兼容多种路径格式: /uploads/temp/... 或 uploads/temp/... 或 绝对路径
+    let relativePath = tempFilePath;
+    if (relativePath.startsWith('/')) relativePath = relativePath.slice(1);
+    
+    // 生产环境 WorkingDirectory 是 /opt/hl-os/backend，uploads 在同级或上级
+    // 根据 index.ts: app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+    // 说明 uploads 就在 process.cwd() 下
     const absoluteTempPath = path.isAbsolute(tempFilePath) 
       ? tempFilePath 
-      : path.join(process.cwd(), tempFilePath.startsWith('/') ? tempFilePath.slice(1) : tempFilePath);
+      : path.join(process.cwd(), relativePath);
 
+    console.log(`[saveBook] [1/5] 验证临时文件: ${absoluteTempPath}`);
     try {
       await fs.access(absoluteTempPath);
-    } catch {
-      return res.status(404).json({
+    } catch (accessErr) {
+      console.error(`[saveBook] ❌ 临时文件不存在: ${absoluteTempPath}`);
+      return res.status(404).json({ 
         success: false,
         error: `临时文件不存在或已过期: ${tempFilePath}`,
       });
     }
 
     // 2. 移动并归档原始文件
+    console.log(`[saveBook] [2/5] 正在归档原始文件...`);
     const fileBuffer = await fs.readFile(absoluteTempPath);
-    const fileName = path.basename(absoluteTempPath);
-    // 移除时间戳前缀（如果 tempFileName 有的话），或者保留，这里保留原样
-    // 实际上 tempFileName 是 timestamp_originalName
-    const savedFilePath = await saveBookFile(fileBuffer, fileName, ownerId, subject, userName);
-    console.log(`[saveBook] 原始文件已归档: ${savedFilePath}`);
+    const originalFileName = path.basename(absoluteTempPath);
+    const savedFilePath = await saveBookFile(fileBuffer, originalFileName, ownerId, subject, userName);
+    console.log(`[saveBook] ✓ 原始文件已归档: ${savedFilePath}`);
 
     // 3. 处理封面图片
-    let finalCoverPath = null;
+    console.log(`[saveBook] [3/5] 正在处理封面图片...`);
     let webCoverPath = null;
     let obsidianCoverPath = null;
 
     if (coverImage) {
-      // 假设 coverImage 是 /uploads/covers/xxx.png 格式的相对路径
-      const tempCoverPath = path.join(process.cwd(), coverImage.startsWith('/') ? coverImage.slice(1) : coverImage);
+      let relativeCover = coverImage;
+      if (relativeCover.startsWith('/')) relativeCover = relativeCover.slice(1);
+      const tempCoverPath = path.join(process.cwd(), relativeCover);
+      
       try {
         await fs.access(tempCoverPath);
-        
         const coverFileName = path.basename(tempCoverPath);
-        // 使用 fileStorage 保存封面，返回文件名
         const savedFileName = await saveBookCover(tempCoverPath, coverFileName);
-        console.log(`[saveBook] 封面已归档: ${savedFileName}`);
-
-        // 构造路径
-        finalCoverPath = savedFileName;
-        // Web 访问路径 (需要在 index.ts 配置静态服务 /covers -> data/obsidian/covers)
         webCoverPath = `/covers/${savedFileName}`;
-        // Obsidian 引用路径 (使用 Wiki Link 格式，Obsidian 会自动查找)
         obsidianCoverPath = `[[${savedFileName}]]`;
-
+        console.log(`[saveBook] ✓ 封面已归档: ${savedFileName}`);
       } catch (err) {
-        console.warn(`[saveBook] 封面图片处理失败: ${coverImage}`, err);
+        console.warn(`[saveBook] ⚠️ 封面图片处理失败 (跳过): ${coverImage}`);
       }
     }
 
-    // 4. 生成 Markdown 内容 (使用 Doubao)
-    console.log('[saveBook] 开始生成 Markdown...');
-    // 读取文本内容用于转换
-    const { parsePDF } = await import('../services/pdfParser.js');
-    const { parseEPUB } = await import('../services/epubParser.js');
-    
-    let contentText = '';
-    const ext = path.extname(fileName).toLowerCase();
-    
-    console.log(`[saveBook] 解析文件内容 (格式: ${ext})...`);
-    if (ext === '.pdf') {
-      try {
-        const result = await parsePDF(fileBuffer);
-        contentText = result.content;
-        console.log(`[saveBook] PDF 解析成功，内容长度: ${contentText.length}`);
-      } catch (parseError) {
-        console.error('[saveBook] PDF 解析失败:', parseError);
-        throw new Error('PDF 解析失败，无法生成内容');
-      }
-    } else if (ext === '.epub') {
-      const result = await parseEPUB(fileBuffer);
-      contentText = JSON.stringify(result);
-    } else {
-      contentText = fileBuffer.toString('utf-8');
-    }
-
-    console.log('[saveBook] 调用 LLM 转换为 Markdown...');
-    const markdownContent = await convertToMarkdown(contentText);
-    console.log('[saveBook] Markdown 转换完成');
-
-    // 5. 保存 Obsidian Markdown 文件
-    // 更新 metadata 中的 coverImage 路径 (使用 Obsidian 格式)
-    const metadataForSave = { ...bookMetadata, coverImage: obsidianCoverPath || '' };
-    const mdFilePath = await saveBookMarkdown(metadataForSave, markdownContent, ownerId, userName);
-    console.log(`[saveBook] Markdown 已保存: ${mdFilePath}`);
-
-    // 6. 生成教材ID
-    const bookId = `book_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-    // 7. 更新元数据索引 (books.json)
-    await updateMetadataIndex({
+    // 4. 立即更新数据库状态为 'processing' 并返回成功
+    console.log(`[saveBook] [4/5] 正在创建数据库记录...`);
+    const initialEntry = {
       id: bookId,
-      type: 'textbook',
+      ...bookMetadata,
       ownerId,
       userName,
-      subject: subject || '综合',
-      chapter: undefined,
       timestamp: Date.now(),
       filePath: savedFilePath,
-      mdPath: mdFilePath,
-      imagePath: webCoverPath || undefined, // 使用 Web 路径供前端显示
-    });
+      imagePath: webCoverPath || undefined,
+      status: 'processing'
+    };
+    await updateMetadataIndex(initialEntry);
 
-    // 8. 推送到 AnythingLLM
-    if (ANYTHINGLLM_API_KEY) {
-      indexBookToAnythingLLM(
-        bookId,
-        ownerId,
-        bookMetadata,
-        contentText, // 使用纯文本索引
-        savedFilePath
-      ).catch(error => {
-        console.error('[saveBook] AnythingLLM索引失败:', error);
-      });
-    }
-
-    // 9. 清理临时文件
-    try {
-      await fs.unlink(absoluteTempPath);
-      // 如果封面也是临时的，可以考虑清理，或者保留在 uploads/covers
-    } catch (e) {
-      console.warn('清理临时文件失败:', e);
-    }
-
-    return res.json({
+    // 返回成功响应给前端，让用户先行跳转
+    res.json({
       success: true,
       data: {
         id: bookId,
         title,
-        filePath: savedFilePath,
-        mdPath: mdFilePath
+        status: 'processing'
       },
     });
 
-  } catch (error) {
-    console.error('[saveBook] 错误:', error);
-    const message = error instanceof Error ? error.message : '保存失败';
-    return res.status(500).json({
-      success: false,
-      error: message,
+    // 5. 异步执行重型任务 (Markdown 转换 & AnythingLLM 索引)
+    // 使用 setImmediate 确保响应已发出
+    setImmediate(async () => {
+      console.log(`[saveBook] [5/5] [Async] 开始后台处理任务: ${bookId}`);
+      try {
+        // A. 生成 Markdown 内容
+        console.log(`[saveBook] [Async] 正在解析 PDF 文本内容...`);
+        const { parsePDF } = await import('../services/pdfParser.js');
+        const parseResult = await parsePDF(fileBuffer);
+        const contentText = parseResult.content;
+        
+        console.log(`[saveBook] [Async] 正在调用 LLM 转换为 Markdown (长度: ${contentText.length})...`);
+        const markdownContent = await convertToMarkdown(contentText);
+        
+        // B. 保存 Obsidian Markdown 文件
+        const metadataForSave = { ...bookMetadata, coverImage: obsidianCoverPath || '' };
+        const mdFilePath = await saveBookMarkdown(metadataForSave, markdownContent, ownerId, userName);
+        console.log(`[saveBook] [Async] ✓ Markdown 已保存: ${mdFilePath}`);
+
+        // C. 推送到 AnythingLLM
+        if (ANYTHINGLLM_API_KEY) {
+          console.log(`[saveBook] [Async] 正在索引到 AnythingLLM...`);
+          await indexBookToAnythingLLM(
+            bookId,
+            ownerId,
+            bookMetadata,
+            contentText,
+            savedFilePath
+          );
+        }
+
+        // D. 更新最终状态
+        await updateMetadataIndex({
+          ...initialEntry,
+          mdPath: mdFilePath,
+          status: 'completed'
+        });
+        console.log(`[saveBook] [Async] 🎉 全部后台任务完成: ${bookId}`);
+
+        // E. 清理临时文件
+        await fs.unlink(absoluteTempPath).catch(() => {});
+        
+      } catch (asyncErr) {
+        console.error(`[saveBook] [Async] ❌ 后台处理失败: ${bookId}`, asyncErr);
+        await updateMetadataIndex({
+          ...initialEntry,
+          status: 'failed'
+        }).catch(() => {});
+      }
     });
+
+  } catch (error) {
+    console.error('[saveBook] ❌ 严重错误:', error);
+    const message = error instanceof Error ? error.message : '保存失败';
+    if (!res.headersSent) {
+      return res.status(500).json({
+        success: false,
+        error: message,
+      });
+    }
   }
 });
 

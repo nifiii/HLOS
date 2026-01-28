@@ -166,18 +166,23 @@ export async function fetchBooks(filters: {
     return data.data.map((item: any) => ({
       id: item.id,
       title: item.metadata?.title || `${item.subject}教材`,
+      author: item.metadata?.author || '',
       fileFormat: 'pdf' as const, // 简化处理
       fileSize: item.fileSize,
       uploadedAt: item.uploadedAt,
       ownerId: item.ownerId,
       filePath: item.filePath,
       subject: item.subject,
-      category: '教材',
+      category: item.metadata?.category || '教材',
       grade: item.metadata?.grade || '',
       tags: item.metadata?.tags || [],
       tableOfContents: [],
-      indexStatus: 'INDEXED' as const,
+      // 映射状态
+      indexStatus: item.status === 'processing' ? IndexStatus.INDEXING : 
+                  item.status === 'completed' ? IndexStatus.INDEXED : 
+                  item.status === 'failed' ? IndexStatus.FAILED : IndexStatus.PENDING,
       anythingLlmDocId: item.anythingLlmDocId,
+      coverUrl: item.metadata?.coverImage || undefined,
     }));
   } catch (error) {
     console.error('[fetchBooks] 失败:', error);
@@ -203,17 +208,21 @@ export async function fetchBookById(id: string): Promise<EBook | null> {
     return {
       id: item.id,
       title: item.metadata?.title || `${item.subject}教材`,
+      author: item.metadata?.author || '',
       fileFormat: 'pdf' as const,
       fileSize: item.fileSize,
       uploadedAt: item.uploadedAt,
       ownerId: item.ownerId,
       subject: item.subject,
-      category: '教材',
+      category: item.metadata?.category || '教材',
       grade: item.metadata?.grade || '',
       tags: item.metadata?.tags || [],
       tableOfContents: [],
-      indexStatus: IndexStatus.INDEXED,
+      indexStatus: item.status === 'processing' ? IndexStatus.INDEXING : 
+                  item.status === 'completed' ? IndexStatus.INDEXED : 
+                  item.status === 'failed' ? IndexStatus.FAILED : IndexStatus.PENDING,
       anythingLlmDocId: item.anythingLlmDocId,
+      coverUrl: item.metadata?.coverImage || undefined,
     };
   } catch (error) {
     console.error('[fetchBookById] 失败:', error);

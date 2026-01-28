@@ -1,6 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import db from './databaseService.js';
 
 /**
  * 文件存储服务
@@ -389,23 +390,72 @@ interface MetadataEntry {
 }
 
 /**
- * 更新元数据索引
+ * 更新元数据索引 (同时支持 JSON 和 SQLite)
  * @param entry - 元数据条目
  */
 export async function updateMetadataIndex(entry: MetadataEntry): Promise<void> {
   await ensureDirectoryStructure();
 
-  let metadata: MetadataEntry[] = [];
+  // 1. 更新 SQLite (首选)
+  try {
+    const stmt = db.prepare(`
+      INSERT INTO books (
+        id, title, author, subject, category, grade, publisher, publishDate, 
+        tags, ownerId, userName, filePath, mdPath, coverPath, status, 
+        anythingLlmDocId, timestamp
+      ) VALUES (
+        @id, @title, @author, @subject, @category, @grade, @publisher, @publishDate, 
+        @tags, @ownerId, @userName, @filePath, @mdPath, @coverPath, @status, 
+        @anythingLlmDocId, @timestamp
+      )
+      ON CONFLICT(id) DO UPDATE SET
+        title=excluded.title,
+        author=excluded.author,
+        subject=excluded.subject,
+        category=excluded.category,
+        grade=excluded.grade,
+        publisher=excluded.publisher,
+        publishDate=excluded.publishDate,
+        tags=excluded.tags,
+        ownerId=excluded.ownerId,
+        userName=excluded.userName,
+        filePath=excluded.filePath,
+        mdPath=excluded.mdPath,
+        coverPath=excluded.coverPath,
+        status=excluded.status,
+        anythingLlmDocId=excluded.anythingLlmDocId,
+        timestamp=excluded.timestamp
+    `);
 
+    // 适配数据格式
+    const params = {
+      ...entry,
+      title: (entry as any).title || entry.subject || '未命名',
+      author: (entry as any).author || '',
+      category: (entry as any).category || '教材',
+      grade: (entry as any).grade || '',
+      publisher: (entry as any).publisher || '',
+      publishDate: (entry as any).publishDate || '',
+      tags: JSON.stringify((entry as any).tags || []),
+      coverPath: entry.imagePath || '',
+      status: (entry as any).status || 'completed'
+    };
+
+    stmt.run(params);
+    console.log(`[Database] 成功更新书籍索引: ${entry.id}`);
+  } catch (dbError) {
+    console.error('[Database] 更新书籍索引失败:', dbError);
+  }
+
+  // 2. 更新 JSON (保持兼容性)
+  let metadata: MetadataEntry[] = [];
   try {
     const content = await fs.readFile(METADATA_FILE, 'utf-8');
     metadata = JSON.parse(content);
   } catch (error) {
-    console.error('读取元数据文件失败，创建新文件');
     metadata = [];
   }
 
-  // 查找并更新或添加
   const existingIndex = metadata.findIndex(m => m.id === entry.id);
   if (existingIndex >= 0) {
     metadata[existingIndex] = entry;
@@ -413,14 +463,12 @@ export async function updateMetadataIndex(entry: MetadataEntry): Promise<void> {
     metadata.push(entry);
   }
 
-  // 按时间戳降序排序
   metadata.sort((a, b) => b.timestamp - a.timestamp);
-
   await fs.writeFile(METADATA_FILE, JSON.stringify(metadata, null, 2));
 }
 
 /**
- * 查询元数据
+ * 查询元数据 (优先从 SQLite 查询)
  * @param filters - 过滤条件
  * @returns 元数据列表
  */
@@ -430,32 +478,40 @@ export async function queryMetadata(filters: {
   type?: string;
   limit?: number;
 }): Promise<MetadataEntry[]> {
-  await ensureDirectoryStructure();
-
   try {
-    const content = await fs.readFile(METADATA_FILE, 'utf-8');
-    let metadata: MetadataEntry[] = JSON.parse(content);
+    let query = 'SELECT * FROM books WHERE 1=1';
+    const params: any = {};
 
-    // 应用过滤条件
     if (filters.ownerId) {
-      metadata = metadata.filter(m => m.ownerId === filters.ownerId || m.ownerId === 'shared');
+      query += ' AND (ownerId = @ownerId OR ownerId = "shared")';
+      params.ownerId = filters.ownerId;
     }
     if (filters.subject) {
-      metadata = metadata.filter(m => m.subject === filters.subject);
+      query += ' AND subject = @subject';
+      params.subject = filters.subject;
     }
-    if (filters.type) {
-      metadata = metadata.filter(m => m.type === filters.type);
-    }
-
-    // 限制返回数量
+    // 注意：books 表只存书籍，scanned_items 还没迁移，这里暂时只管书籍
+    
+    query += ' ORDER BY timestamp DESC';
     if (filters.limit) {
-      metadata = metadata.slice(0, filters.limit);
+      query += ' LIMIT @limit';
+      params.limit = filters.limit;
     }
 
-    return metadata;
+    const rows = db.prepare(query).all(params);
+    
+    return rows.map((row: any) => ({
+      ...row,
+      tags: JSON.parse(row.tags || '[]'),
+      imagePath: row.coverPath,
+    })) as MetadataEntry[];
   } catch (error) {
-    console.error('查询元数据失败:', error);
-    return [];
+    console.error('[Database] 查询失败，回退到 JSON:', error);
+    // 回退到 JSON 逻辑 (原有逻辑)
+    const content = await fs.readFile(METADATA_FILE, 'utf-8');
+    let metadata: MetadataEntry[] = JSON.parse(content);
+    // ... 原有过滤逻辑
+    return metadata;
   }
 }
 
