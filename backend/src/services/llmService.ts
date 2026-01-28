@@ -1,8 +1,7 @@
 import { analyzeMetadataWithDoubao, convertToMarkdownWithDoubao } from './doubaoService.js';
-import { analyzeMetadataWithOpenAI, convertToMarkdownWithOpenAI } from './openaiService.js';
 import { ChapterNode } from '../types.js';
 
-export type LLMProvider = 'doubao' | 'openai';
+export type LLMProvider = 'doubao';
 
 // 定义统一的返回接口
 export interface LLMMetadataResult {
@@ -17,44 +16,25 @@ export interface LLMMetadataResult {
   tableOfContents: ChapterNode[];
 }
 
-// 获取当前配置的 Provider，默认为 doubao
-const getCurrentProvider = (): LLMProvider => {
-  return (process.env.LLM_PROVIDER as LLMProvider) || 'doubao';
-};
-
 /**
- * 统一的元数据分析入口
+ * 统一的元数据分析入口 (目前强制使用 Doubao)
  */
 export async function analyzeMetadata(
   text: string,
   fileName: string,
   provider?: LLMProvider
 ): Promise<LLMMetadataResult> {
-  const useProvider = provider || getCurrentProvider();
-  
-  console.log(`正在使用 ${useProvider} 服务分析元数据...`);
-
-  if (useProvider === 'openai') {
-    return analyzeMetadataWithOpenAI(text, fileName);
-  } else {
-    return analyzeMetadataWithDoubao(text, fileName);
-  }
+  console.log(`正在使用 doubao 服务分析元数据...`);
+  return analyzeMetadataWithDoubao(text, fileName);
 }
 
 /**
- * 统一的 Markdown 转换入口
+ * 统一的 Markdown 转换入口 (目前强制使用 Doubao)
  */
 export async function convertToMarkdown(
   text: string,
   provider?: LLMProvider
 ): Promise<string> {
-  const useProvider = provider || getCurrentProvider();
-
-  console.log(`正在使用 ${useProvider} 服务转换 Markdown...`);
-
-  if (useProvider === 'openai') {
-    return convertToMarkdownWithOpenAI(text);
-  } else {
-    return convertToMarkdownWithDoubao(text);
-  }
+  console.log(`正在使用 doubao 服务转换 Markdown...`);
+  return convertToMarkdownWithDoubao(text);
 }
