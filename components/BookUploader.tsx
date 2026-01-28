@@ -107,76 +107,34 @@ export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, onM
 
     console.log('📤 开始上传图书，端点: /api/upload-chunk');
     // 使用分���上传
-    const result = await uploadFile(file, ownerId, '/api/upload-chunk');
+    // 使用单文件上传
+    const result = await uploadFile(file, ownerId, '/api/upload-book');
 
-    if (result.success && result.filePath) {
+    if (result.success && result.data) {
       setSuccess(true);
-      setUploadResult(result);
+      
+      // 上传成功后，result.data 中已经包含了 metadata
+      console.log('✅ 图书上传并解析成功:', result.data);
 
-      // 合并成功后，调用 upload-book 接口解析图书
-      console.log('✅ 分片上传完成，开始解析图书...');
+      const parseData = result.data;
+      
+      // 更新 uploadResult，包含解析后的元数据和置信度
+      setUploadResult({
+        success: true,
+        filePath: '', // 兼容字段
+        metadata: {
+          ...parseData.metadata,
+          fileName: parseData.fileName,
+          fileFormat: parseData.fileFormat,
+          fileSize: parseData.fileSize,
+          pageCount: parseData.pageCount,
+        },
+        confidence: parseData.confidence,
+        extractionMethod: parseData.extractionMethod
+      });
 
-      try {
-        // 调用新的解析接口
-        const parseResponse = await fetch('/api/upload-book/parse', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            filePath: result.filePath,
-            fileName: file.name,
-            ownerId: ownerId
-          }),
-        });
-
-        if (parseResponse.ok) {
-          const parseData = await parseResponse.json();
-          console.log('✅ 图书元数据提取成功:', parseData.data);
-
-          // 更新 uploadResult，包含解析后的元数据和置信度
-          setUploadResult({
-            ...result,
-            metadata: {
-              ...parseData.data.metadata,
-              fileName: parseData.data.fileName,
-              fileFormat: parseData.data.fileFormat,
-              fileSize: parseData.data.fileSize,
-              pageCount: parseData.data.pageCount,
-            },
-            confidence: parseData.data.confidence,
-            extractionMethod: parseData.data.extractionMethod
-          });
-
-          // 直接显示编辑器，不延迟
-          setShowEditor(true);
-        } else {
-          throw new Error('解析失败');
-        }
-      } catch (error) {
-        console.error('❌ 元数据提取失败，使用默认信息:', error);
-
-        // 解析失败时使用默认元数据
-        const defaultMetadata = {
-          title: file.name.replace(/\.(pdf|epub|txt)$/i, ''),
-          author: '',
-          subject: '其他',
-          grade: '',
-          category: '教科书',
-          publisher: '',
-          publishDate: '',
-          tags: [],
-          coverImage: null
-        };
-
-        setUploadResult({
-          ...result,
-          metadata: defaultMetadata
-        });
-
-        // 仍然显示编辑器，让用户手动填写
-        setTimeout(() => {
-          setShowEditor(true);
-        }, 500);
-      }
+      // 直接显示编辑器，不延迟
+      setShowEditor(true);
     } else {
       setError(result.error || '上传失败，请重试');
     }
