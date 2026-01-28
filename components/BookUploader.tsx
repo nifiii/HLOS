@@ -84,6 +84,7 @@ export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, onM
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadResult, setUploadResult] = useState<ExtendedChunkedUploadResult | null>(null);
   const [showEditor, setShowEditor] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -124,6 +125,7 @@ export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, onM
       setUploadResult({
         success: true,
         filePath: '', // 兼容字段
+        tempFilePath: parseData.tempFilePath, // 保存临时文件路径，用于后续确认
         metadata: {
           ...parseData.metadata,
           fileName: parseData.fileName,
@@ -146,10 +148,15 @@ export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, onM
     if (!uploadResult || !selectedFile) return;
 
     try {
+      setIsSaving(true);
+      setError('');
+
       const confirmedMetadata = {
         ...metadata,
         tableOfContents: []
       };
+
+      console.log('保存图书，使用临时文件:', uploadResult.tempFilePath);
 
       // 调用后端 API 保存图书
       await confirmBookUpload(
@@ -163,14 +170,15 @@ export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, onM
       setShowEditor(false);
 
       // 重置表单
-      setTimeout(() => {
-        setSuccess(false);
-        setSelectedFile(null);
-        setUploadResult(null);
-        resetProgress();
-      }, 2000);
+      setSuccess(false);
+      setSelectedFile(null);
+      setUploadResult(null);
+      resetProgress();
     } catch (err: any) {
+      console.error('保存图书失败:', err);
       setError('保存失败: ' + (err.message || '未知错误'));
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -254,6 +262,7 @@ export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, onM
             notes: uploadResult.metadata.notes || ''
           }}
           confidence={uploadResult.confidence || { overall: 0, fields: {} }}
+          isSaving={isSaving}
           onSave={(metadata) => {
             handleSaveMetadata({
               ...uploadResult.metadata,

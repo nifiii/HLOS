@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Save } from 'lucide-react';
+import { X, Save, Loader2 } from 'lucide-react';
 import ConfidenceBadge from './ui/ConfidenceBadge';
 import { EBook } from '../types';
 
@@ -33,6 +33,7 @@ interface BookMetadataModalProps {
   fileName: string;
   initialMetadata: BookMetadata;
   confidence: ConfidenceData;
+  isSaving?: boolean;
   onSave: (metadata: BookMetadata) => void;
   onCancel: () => void;
 }
@@ -41,6 +42,7 @@ export const BookMetadataModal: React.FC<BookMetadataModalProps> = ({
   fileName,
   initialMetadata,
   confidence,
+  isSaving = false,
   onSave,
   onCancel
 }) => {
@@ -283,10 +285,22 @@ export const BookMetadataModal: React.FC<BookMetadataModalProps> = ({
           </button>
           <button
             onClick={handleSave}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+            disabled={isSaving}
+            className={`px-6 py-2 rounded-lg text-white transition-colors flex items-center gap-2 ${
+              isSaving ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+            }`}
           >
-            <Save className="w-4 h-4" />
-            保存到图书馆
+            {isSaving ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                正在保存...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4" />
+                保存到图书馆
+              </>
+            )}
           </button>
         </div>
       </div>
