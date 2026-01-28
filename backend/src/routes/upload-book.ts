@@ -79,11 +79,10 @@ router.post('/upload-book', upload.single('file'), async (req: Request, res: Res
         });
     }
 
-    // 使用 Gemini 分析元数据
+    // 使用统一 LLM 服务分析元数据
     console.log('开始 AI 元数据分析...');
-    const aiMetadata = await analyzeBookMetadata(
+    const aiMetadata = await analyzeMetadata(
       parseResult.content,
-      parseResult.tableOfContents,
       file.originalname
     );
 
