@@ -79,12 +79,9 @@ router.post('/upload-book', upload.single('file'), async (req: Request, res: Res
         });
     }
 
-    // 使用统一 LLM 服务分析元数据和转换 Markdown (并行执行)
-    console.log('开始 AI 处理 (元数据 + Markdown)...');
-    const [aiMetadata, markdownContent] = await Promise.all([
-      analyzeMetadata(parseResult.content, file.originalname),
-      convertToMarkdown(parseResult.content)
-    ]);
+    // 使用统一 LLM 服务分析元数据 (不再在此转换 Markdown，避免超时)
+    console.log('开始 AI 元数据分析...');
+    const aiMetadata = await analyzeMetadata(parseResult.content, file.originalname);
 
     // 将文件保存到临时目录，供 saveBook 使用
     const tempDir = path.join(process.cwd(), 'uploads', 'temp');
@@ -97,15 +94,11 @@ router.post('/upload-book', upload.single('file'), async (req: Request, res: Res
     // 保存原始 PDF
     await fs.writeFile(tempFilePath, file.buffer);
     
-    // 保存文本全文 (.txt)
+    // 保存文本全文 (.txt)，供后续后台转换 Markdown 使用
     const tempTxtPath = tempFilePath.replace(path.extname(tempFilePath), '.txt');
     await fs.writeFile(tempTxtPath, parseResult.content);
     
-    // 保存预生成的 Markdown (.md)
-    const tempMdPath = tempFilePath.replace(path.extname(tempFilePath), '.md');
-    await fs.writeFile(tempMdPath, markdownContent);
-    
-    console.log(`[upload-book] 临时文件已就绪: PDF, TXT, MD (${baseId})`);
+    console.log(`[upload-book] 临时文件已就绪: PDF, TXT (${baseId})`);
     
     // 提取封面图片
     let coverImage = null;
@@ -225,28 +218,23 @@ router.post('/upload-book/parse', async (req: Request, res: Response) => {
           let aiMetadata;
           let coverImage = null;
           
-          // 并行执行：元数据提取 + 封面生成 + Markdown 转换
+          // 并行执行：元数据提取 + 封面生成
           try {
             // 解析 PDF 内容
             const pdfParseResult = await parsePDF(fileBuffer);
             
-            const [metadataResult, coverImageName, markdownContent] = await Promise.all([
+            const [metadataResult, coverImageName] = await Promise.all([
               analyzeMetadata(pdfParseResult.content, fileName),
-              extractCoverImage(fullPath, path.join(process.cwd(), 'uploads', 'covers')),
-              convertToMarkdown(pdfParseResult.content)
+              extractCoverImage(fullPath, path.join(process.cwd(), 'uploads', 'covers'))
             ]);
             
             aiMetadata = metadataResult;
             coverImage = coverImageName ? `/uploads/covers/${coverImageName}` : null;
             
-            // 同样保存临时 .md 和 .txt 文件 (如果是从 uploads 目录解析的)
+            // 保存临时 .txt 文件 (如果是从 uploads 目录解析的)，供后续后台转换使用
             if (fullPath.includes('uploads')) {
-              const tempMdPath = fullPath.replace(path.extname(fullPath), '.md');
               const tempTxtPath = fullPath.replace(path.extname(fullPath), '.txt');
-              await Promise.all([
-                fs.writeFile(tempMdPath, markdownContent),
-                fs.writeFile(tempTxtPath, pdfParseResult.content)
-              ]);
+              await fs.writeFile(tempTxtPath, pdfParseResult.content);
             }
           } catch (aiError) {
             console.error('AI 处理失败:', aiError);

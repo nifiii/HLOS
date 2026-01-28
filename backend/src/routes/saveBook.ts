@@ -8,6 +8,7 @@ import {
   saveBookMarkdown,
   updateMetadataIndex
 } from '../services/fileStorage.js';
+import { convertToMarkdown } from '../services/llmService.js';
 
 const router = express.Router();
 
@@ -94,58 +95,83 @@ router.post('/save-book', upload.none(), async (req: Request, res: Response) => 
       }
     }
 
-    // 4. 处理 Markdown 文件 (使用 upload 阶段预生成的)
-    console.log(`[saveBook] [4/5] 正在处理 Markdown 文件...`);
-    let mdFilePath = null;
-    const tempMdPath = absoluteTempPath.replace(path.extname(absoluteTempPath), '.md');
-    
-    try {
-      await fs.access(tempMdPath);
-      const markdownContent = await fs.readFile(tempMdPath, 'utf-8');
-      const metadataForSave = { ...bookMetadata, coverImage: obsidianCoverPath || '' };
-      mdFilePath = await saveBookMarkdown(metadataForSave, markdownContent, ownerId, userName);
-      console.log(`[saveBook] ✓ Markdown 已归档: ${mdFilePath}`);
-    } catch (err) {
-      console.warn(`[saveBook] ⚠️ 预生成 Markdown 不存在或读取失败: ${tempMdPath}`);
-    }
-
-    // 5. 更新数据库记录
-    console.log(`[saveBook] [5/5] 正在更新数据库记录...`);
-    const finalEntry = {
+    // 4. 更新初步数据库记录 (标记为处理中)
+    console.log(`[saveBook] [4/5] 正在更新数据库初步记录...`);
+    const initialEntry = {
       id: bookId,
       ...bookMetadata,
       ownerId,
       userName,
       timestamp: Date.now(),
       filePath: savedFilePath,
-      mdPath: mdFilePath,
+      mdPath: undefined,
       imagePath: webCoverPath || undefined,
-      status: 'completed'
+      status: 'processing'
     };
-    await updateMetadataIndex(finalEntry);
+    await updateMetadataIndex(initialEntry);
 
-    // 返回成功响应给前端
+    // 5. 返回成功响应给前端 (不再等待 Markdown 转换)
     res.json({
       success: true,
       data: {
         id: bookId,
         title,
-        status: 'completed'
+        status: 'processing'
       },
     });
 
-    // 6. 异步清理所有临时文件
+    // 6. 异步处理：转换 Markdown 并清理临时文件
     setImmediate(async () => {
       try {
+        console.log(`[saveBook] [Async] 开始后台转换 Markdown: ${bookId}`);
         const tempTxtPath = absoluteTempPath.replace(path.extname(absoluteTempPath), '.txt');
-        await Promise.all([
-          fs.unlink(absoluteTempPath).catch(() => {}),
-          fs.unlink(tempMdPath).catch(() => {}),
-          fs.unlink(tempTxtPath).catch(() => {})
-        ]);
-        console.log(`[saveBook] [Async] 临时文件清理完成: ${bookId}`);
+        const tempMdPath = absoluteTempPath.replace(path.extname(absoluteTempPath), '.md');
+        
+        let mdFilePath = null;
+
+        try {
+          // 优先尝试读取已有的 .txt 文件 (由 upload 阶段生成)
+          await fs.access(tempTxtPath);
+          const content = await fs.readFile(tempTxtPath, 'utf-8');
+          
+          // 调用 AI 转换 Markdown
+          const markdownContent = await convertToMarkdown(content);
+          
+          // 保存正式的 Markdown 文件
+          const metadataForSave = { ...bookMetadata, coverImage: obsidianCoverPath || '' };
+          mdFilePath = await saveBookMarkdown(metadataForSave, markdownContent, ownerId, userName);
+          
+          console.log(`[saveBook] [Async] ✓ Markdown 转换完成: ${mdFilePath}`);
+          
+          // 更新数据库记录为完成
+          await updateMetadataIndex({
+            ...initialEntry,
+            mdPath: mdFilePath,
+            status: 'completed'
+          });
+          
+        } catch (convErr) {
+          console.error(`[saveBook] [Async] ❌ Markdown 转换失败: ${bookId}`, convErr);
+          // 即使转换失败，也把状态改为 completed 或 failed，这里选 completed 但 mdPath 为空
+          await updateMetadataIndex({
+            ...initialEntry,
+            status: 'completed'
+          });
+        }
+
+        // 清理所有临时文件
+        try {
+          await Promise.all([
+            fs.unlink(absoluteTempPath).catch(() => {}),
+            fs.unlink(tempMdPath).catch(() => {}),
+            fs.unlink(tempTxtPath).catch(() => {})
+          ]);
+          console.log(`[saveBook] [Async] 临时文件清理完成: ${bookId}`);
+        } catch (cleanupErr) {
+          console.warn(`[saveBook] [Async] ⚠️ 清理临时文件时出现警告: ${bookId}`, cleanupErr);
+        }
       } catch (err) {
-        console.error(`[saveBook] [Async] ❌ 清理失败: ${bookId}`, err);
+        console.error(`[saveBook] [Async] ❌ 异步处理过程中出现严重错误: ${bookId}`, err);
       }
     });
 
