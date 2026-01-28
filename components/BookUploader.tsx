@@ -4,6 +4,7 @@ import { EBook, IndexStatus } from '../types';
 import { useChunkedUpload, ChunkedUploadResult } from '../hooks/useChunkedUpload';
 import UploadProgressBar from './UploadProgressBar';
 import BookMetadataModal from './BookMetadataModal';
+import { confirmBookUpload } from '../services/apiService';
 
 interface UploadResult {
   fileName: string;
