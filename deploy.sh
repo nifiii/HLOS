@@ -178,7 +178,8 @@ cp -r $BUILD_DIR/backend/dist $INSTALL_DIR/backend/
 echo "   → 安装后端依赖..."
 cp backend/package*.json $INSTALL_DIR/backend/
 cd $INSTALL_DIR/backend
-npm install --omit=dev --production 2>/dev/null || npm install --omit=dev
+# 增加 --legacy-peer-deps 以避免版本冲突
+npm install --omit=dev --production --legacy-peer-deps 2>/dev/null || npm install --omit=dev --legacy-peer-deps
 cd - > /dev/null
 
 # 复制环境变量（从 /opt/.env 获取权威配置）
@@ -293,8 +294,22 @@ server {
         proxy_cache_bypass $http_upgrade;
 
         # 大文件上传
-        client_max_body_size 100M;
+        client_max_body_size 1024M;
         proxy_request_buffering off;
+    }
+
+    # 数据目录 - 封面图片
+    location /covers/ {
+        alias /opt/hl-os/data/obsidian/covers/;
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # 数据目录 - 原始图片
+    location /data/images/ {
+        alias /opt/hl-os/data/originals/images/;
+        expires 30d;
+        add_header Cache-Control "public, immutable";
     }
 
     # 健康检查端点

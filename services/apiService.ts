@@ -236,3 +236,42 @@ export async function healthCheck(): Promise<{ status: string; timestamp: number
     throw error;
   }
 }
+
+/**
+ * 确认上传并保存图书
+ * @param metadata - 图书元数据
+ * @param tempFilePath - 临时文件路径
+ * @param ownerId - 用户 ID
+ * @returns 保存结果
+ */
+export async function confirmBookUpload(
+  metadata: any,
+  tempFilePath: string,
+  ownerId: string
+): Promise<any> {
+  try {
+    const response = await fetch(`${API_BASE}/save-book`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        metadata,
+        coverImage: metadata.coverImage,
+        tempFilePath,
+        ownerId,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      handleApiError(response, data);
+    }
+
+    return data.data;
+  } catch (error) {
+    console.error('[confirmBookUpload] 失败:', error);
+    throw error;
+  }
+}

@@ -86,6 +86,31 @@ router.post('/upload-book', upload.single('file'), async (req: Request, res: Res
       file.originalname
     );
 
+    // 将文件保存到临时目录，供 saveBook 使用
+    const tempDir = path.join(process.cwd(), 'uploads', 'temp');
+    await fs.mkdir(tempDir, { recursive: true });
+    const tempFileName = `${Date.now()}_${file.originalname}`;
+    const tempFilePath = path.join(tempDir, tempFileName);
+    await fs.writeFile(tempFilePath, file.buffer);
+    
+    // 提取封面图片
+    let coverImage = null;
+    if (fileFormat === 'pdf') {
+      try {
+        const coversDir = path.join(process.cwd(), 'uploads', 'covers');
+        await fs.mkdir(coversDir, { recursive: true });
+        const coverName = await extractCoverImage(tempFilePath, coversDir);
+        if (coverName) {
+          coverImage = `/uploads/covers/${coverName}`;
+        }
+      } catch (err) {
+        console.warn('封面提取失败:', err);
+      }
+    }
+    
+    // 返回相对路径，方便前端回传
+    const relativeTempPath = `/uploads/temp/${tempFileName}`;
+
     // 返回解析结果和 AI 元数据
     return res.json({
       success: true,
@@ -95,10 +120,12 @@ router.post('/upload-book', upload.single('file'), async (req: Request, res: Res
         fileSize: file.size,
         pageCount: parseResult.pageCount,
         content: parseResult.content,
+        tempFilePath: relativeTempPath, // 返回临时文件路径
         // 合并初步元数据和 AI 元数据
         metadata: {
           ...parseResult.estimatedMetadata,
           ...aiMetadata,
+          coverImage, // 添加封面图片路径
         },
       },
     });
@@ -198,26 +225,8 @@ router.post('/upload-book/parse', async (req: Request, res: Response) => {
             aiMetadata = metadataResult;
             coverImage = coverImageName ? `/uploads/covers/${coverImageName}` : null;
             
-            // 异步触发 Markdown 转换和存储 (不阻塞响应)
-            // TODO: 这里可以放入消息队列，暂时用异步函数处理
-            (async () => {
-              try {
-                console.log('开始后台转换 Markdown...');
-                const markdown = await convertToMarkdown(pdfParseResult.content);
-                
-                // 确定存储路径
-                const subjectDir = aiMetadata?.subject || '其他';
-                const outputDir = path.join(process.cwd(), 'data', 'obsidian', 'Books', subjectDir);
-                await fs.mkdir(outputDir, { recursive: true });
-                
-                const mdFileName = `${fileName.replace('.pdf', '')}.md`;
-                await fs.writeFile(path.join(outputDir, mdFileName), markdown);
-                console.log(`Markdown 已保存至: ${path.join(outputDir, mdFileName)}`);
-              } catch (err) {
-                console.error('后台 Markdown 转换失败:', err);
-              }
-            })();
-
+            // 异步触发 Markdown 转换和存储 (已移除，移至 saveBook.ts 处理)
+            // console.log('Markdown 转换已推迟至用户确认后');
           } catch (aiError) {
             console.error('AI 处理失败:', aiError);
             // 降级处理：仅使用基本信息

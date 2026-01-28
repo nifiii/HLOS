@@ -1,10 +1,12 @@
 import express, { Request, Response } from 'express';
 import multer from 'multer';
-import { parsePDF } from '../services/pdfParser.js';
-import { parseEPUB } from '../services/epubParser.js';
-import { analyzeBookMetadata } from '../services/bookMetadataAnalyzer.js';
+import path from 'path';
+import fs from 'fs/promises';
+import { convertToMarkdown } from '../services/llmService.js';
 import {
   saveBookFile,
+  saveBookCover,
+  saveBookMarkdown,
   updateMetadataIndex
 } from '../services/fileStorage.js';
 import fetch from 'node-fetch';
@@ -14,27 +16,8 @@ const router = express.Router();
 const ANYTHINGLLM_BASE_URL = process.env.ANYTHINGLLM_ENDPOINT || 'http://localhost:3001';
 const ANYTHINGLLM_API_KEY = process.env.ANYTHINGLLM_API_KEY;
 
-// 配置 multer 用于文件上传
-const storage = multer.memoryStorage();
-const upload = multer({
-  storage,
-  limits: {
-    fileSize: 100 * 1024 * 1024, // 100MB 限制
-  },
-  fileFilter: (req, file, cb) => {
-    const allowedMimeTypes = [
-      'application/pdf',
-      'application/epub+zip',
-      'text/plain',
-    ];
-
-    if (allowedMimeTypes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('不支持的文件格式，仅支持 PDF、EPUB、TXT'));
-    }
-  },
-});
+// 配置 multer (不再用于接收文件流，因为现在是纯 JSON 请求)
+const upload = multer();
 
 // 用户名映射
 const USER_NAMES: Record<string, string> = {
@@ -45,109 +28,157 @@ const USER_NAMES: Record<string, string> = {
 
 /**
  * POST /api/save-book
- * 保存教材到文件系统并索引到 AnythingLLM
+ * 保存教材到文件系统、生成 Markdown 并索引到 AnythingLLM
+ * 接收参数：metadata (JSON), coverImage (path), tempFilePath (path)
  */
-router.post('/save-book', upload.single('file'), async (req: Request, res: Response) => {
+router.post('/save-book', upload.none(), async (req: Request, res: Response) => {
   try {
-    if (!req.file) {
+    const { metadata, coverImage, tempFilePath, ownerId = 'shared' } = req.body;
+
+    if (!metadata || !tempFilePath) {
       return res.status(400).json({
         success: false,
-        error: '未上传文件',
+        error: '缺少必要参数 (metadata, tempFilePath)',
       });
     }
 
-    const file = req.file;
-    const ownerId = req.body.ownerId || 'shared';
-    const fileFormat = getFileFormat(file.mimetype);
+    // 解析 metadata
+    const bookMetadata = typeof metadata === 'string' ? JSON.parse(metadata) : metadata;
+    const { title, subject, category, tags } = bookMetadata;
+    const userName = USER_NAMES[ownerId] || '共享';
 
-    console.log(`[saveBook] 开始保存教材: ${file.originalname}`);
+    console.log(`[saveBook] 开始保存教材: ${title} (${subject})`);
 
-    // 1. 保存原始文件到文件系统
-    const filePath = await saveBookFile(file.buffer, file.originalname, ownerId);
-    console.log(`[saveBook] 文件已保存: ${filePath}`);
+    // 1. 验证临时文件是否存在
+    // 注意：tempFilePath 应该是绝对路径或相对于项目根目录的路径
+    // 前端传递的可能是相对路径，需要处理
+    const absoluteTempPath = path.isAbsolute(tempFilePath) 
+      ? tempFilePath 
+      : path.join(process.cwd(), tempFilePath.startsWith('/') ? tempFilePath.slice(1) : tempFilePath);
 
-    // 2. 解析文件内容
-    let parseResult;
-    switch (fileFormat) {
-      case 'pdf':
-        parseResult = await parsePDF(file.buffer);
-        break;
-      case 'epub':
-        parseResult = await parseEPUB(file.buffer);
-        break;
-      case 'txt':
-        parseResult = {
-          content: file.buffer.toString('utf-8'),
-          pageCount: 1,
-          estimatedMetadata: {},
-          tableOfContents: [],
-        };
-        break;
-      default:
-        return res.status(400).json({
-          success: false,
-          error: `不支持的文件格式: ${fileFormat}`,
-        });
+    try {
+      await fs.access(absoluteTempPath);
+    } catch {
+      return res.status(404).json({
+        success: false,
+        error: `临时文件不存在或已过期: ${tempFilePath}`,
+      });
     }
 
-    // 3. 使用 Gemini 分析元数据
-    console.log('[saveBook] 开始 AI 元数据分析...');
-    const aiMetadata = await analyzeBookMetadata(
-      parseResult.content,
-      parseResult.tableOfContents,
-      file.originalname
-    );
+    // 2. 移动并归档原始文件
+    const fileBuffer = await fs.readFile(absoluteTempPath);
+    const fileName = path.basename(absoluteTempPath);
+    // 移除时间戳前缀（如果 tempFileName 有的话），或者保留，这里保留原样
+    // 实际上 tempFileName 是 timestamp_originalName
+    const savedFilePath = await saveBookFile(fileBuffer, fileName, ownerId, subject, userName);
+    console.log(`[saveBook] 原始文件已归档: ${savedFilePath}`);
 
-    // 4. 生成教材ID
+    // 3. 处理封面图片
+    let finalCoverPath = null;
+    let webCoverPath = null;
+    let obsidianCoverPath = null;
+
+    if (coverImage) {
+      // 假设 coverImage 是 /uploads/covers/xxx.png 格式的相对路径
+      const tempCoverPath = path.join(process.cwd(), coverImage.startsWith('/') ? coverImage.slice(1) : coverImage);
+      try {
+        await fs.access(tempCoverPath);
+        
+        const coverFileName = path.basename(tempCoverPath);
+        // 使用 fileStorage 保存封面，返回文件名
+        const savedFileName = await saveBookCover(tempCoverPath, coverFileName);
+        console.log(`[saveBook] 封面已归档: ${savedFileName}`);
+
+        // 构造路径
+        finalCoverPath = savedFileName;
+        // Web 访问路径 (需要在 index.ts 配置静态服务 /covers -> data/obsidian/covers)
+        webCoverPath = `/covers/${savedFileName}`;
+        // Obsidian 引用路径 (使用 Wiki Link 格式，Obsidian 会自动查找)
+        obsidianCoverPath = `[[${savedFileName}]]`;
+
+      } catch (err) {
+        console.warn(`[saveBook] 封面图片处理失败: ${coverImage}`, err);
+      }
+    }
+
+    // 4. 生成 Markdown 内容 (使用 Doubao)
+    console.log('[saveBook] 开始生成 Markdown...');
+    // 读取文本内容用于转换
+    const { parsePDF } = await import('../services/pdfParser.js');
+    const { parseEPUB } = await import('../services/epubParser.js');
+    
+    let contentText = '';
+    const ext = path.extname(fileName).toLowerCase();
+    
+    if (ext === '.pdf') {
+      const result = await parsePDF(fileBuffer);
+      contentText = result.content;
+    } else if (ext === '.epub') {
+      const result = await parseEPUB(fileBuffer);
+      contentText = JSON.stringify(result);
+    } else {
+      contentText = fileBuffer.toString('utf-8');
+    }
+
+    const markdownContent = await convertToMarkdown(contentText);
+
+    // 5. 保存 Obsidian Markdown 文件
+    // 更新 metadata 中的 coverImage 路径 (使用 Obsidian 格式)
+    const metadataForSave = { ...bookMetadata, coverImage: obsidianCoverPath || '' };
+    const mdFilePath = await saveBookMarkdown(metadataForSave, markdownContent, ownerId, userName);
+    console.log(`[saveBook] Markdown 已保存: ${mdFilePath}`);
+
+    // 6. 生成教材ID
     const bookId = `book_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    // 5. 更新元数据索引
+    // 7. 更新元数据索引 (books.json)
     await updateMetadataIndex({
       id: bookId,
       type: 'textbook',
       ownerId,
-      userName: USER_NAMES[ownerId] || '共享',
-      subject: aiMetadata.subject || '综合',
+      userName,
+      subject: subject || '综合',
       chapter: undefined,
       timestamp: Date.now(),
-      filePath,
+      filePath: savedFilePath,
+      mdPath: mdFilePath,
+      imagePath: webCoverPath || undefined, // 使用 Web 路径供前端显示
     });
-    console.log('[saveBook] 元数据索引已更新');
 
-    // 6. 推送到 AnythingLLM（异步，不阻塞响应）
+    // 8. 推送到 AnythingLLM
     if (ANYTHINGLLM_API_KEY) {
       indexBookToAnythingLLM(
         bookId,
         ownerId,
-        aiMetadata,
-        parseResult.content,
-        filePath
+        bookMetadata,
+        contentText, // 使用纯文本索引
+        savedFilePath
       ).catch(error => {
         console.error('[saveBook] AnythingLLM索引失败:', error);
       });
     }
 
-    // 返回解析结果和 AI 元数据
+    // 9. 清理临时文件
+    try {
+      await fs.unlink(absoluteTempPath);
+      // 如果封面也是临时的，可以考虑清理，或者保留在 uploads/covers
+    } catch (e) {
+      console.warn('清理临时文件失败:', e);
+    }
+
     return res.json({
       success: true,
       data: {
         id: bookId,
-        fileName: file.originalname,
-        fileFormat,
-        fileSize: file.size,
-        pageCount: parseResult.pageCount,
-        filePath,
-        // 合并初步元数据和 AI 元数据
-        metadata: {
-          ...parseResult.estimatedMetadata,
-          ...aiMetadata,
-        },
+        title,
+        filePath: savedFilePath,
+        mdPath: mdFilePath
       },
     });
 
   } catch (error) {
     console.error('[saveBook] 错误:', error);
-    const message = error instanceof Error ? error.message : '文件保存失败';
+    const message = error instanceof Error ? error.message : '保存失败';
     return res.status(500).json({
       success: false,
       error: message,

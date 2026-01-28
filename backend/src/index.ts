@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
 import analyzeRouter from './routes/analyze.js';
 import coursewareRouter from './routes/courseware.js';
 import assessmentRouter from './routes/assessment.js';
@@ -33,6 +34,15 @@ app.use((req, res, next) => {
   }
   next();
 });
+
+// 静态文件服务
+// 1. 上传的临时文件
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+// 2. 数据目录 (用于 serving 封面等)
+// 注意：生产环境建议使用 Nginx
+const DATA_DIR = process.env.DATA_DIR || '/opt/hl-os/data';
+app.use('/covers', express.static(path.join(DATA_DIR, 'obsidian', 'covers')));
+app.use('/data/images', express.static(path.join(DATA_DIR, 'originals', 'images')));
 
 // 健康检查
 app.get('/api/health', (req, res) => {

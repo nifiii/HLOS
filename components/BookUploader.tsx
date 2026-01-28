@@ -38,6 +38,7 @@ interface UploadResult {
 
 // 扩展 ChunkedUploadResult 以支持置信度
 interface ExtendedChunkedUploadResult extends Omit<ChunkedUploadResult, 'metadata'> {
+  tempFilePath?: string; // 添加临时文件路径字段
   metadata?: {
     title: string;
     author?: string;
@@ -140,32 +141,36 @@ export const BookUploader: React.FC<BookUploaderProps> = ({ onUploadSuccess, onM
     }
   };
 
-  const handleSaveMetadata = (metadata: any) => {
+  const handleSaveMetadata = async (metadata: any) => {
     if (!uploadResult || !selectedFile) return;
 
-    const finalResult: UploadResult = {
-      fileName: uploadResult.metadata?.fileName || selectedFile.name,
-      fileFormat: uploadResult.metadata?.fileFormat || 'pdf',
-      fileSize: uploadResult.metadata?.fileSize || selectedFile.size,
-      pageCount: uploadResult.metadata?.pageCount || 0,
-      content: '', // 内容不传给前端，只保存元数据
-      metadata: {
+    try {
+      const confirmedMetadata = {
         ...metadata,
         tableOfContents: []
-      }
-    };
+      };
 
-    // 元数据已确认，通知父组件刷新列表并跳转到浏览页面
-    onMetadataConfirmed();
-    setShowEditor(false);
+      // 调用后端 API 保存图书
+      await confirmBookUpload(
+        confirmedMetadata,
+        uploadResult.tempFilePath!,
+        ownerId
+      );
 
-    // 重置表单
-    setTimeout(() => {
-      setSuccess(false);
-      setSelectedFile(null);
-      setUploadResult(null);
-      resetProgress();
-    }, 2000);
+      // 元数据已确认，通知父组件刷新列表并跳转到浏览页面
+      onMetadataConfirmed();
+      setShowEditor(false);
+
+      // 重置表单
+      setTimeout(() => {
+        setSuccess(false);
+        setSelectedFile(null);
+        setUploadResult(null);
+        resetProgress();
+      }, 2000);
+    } catch (err: any) {
+      setError('保存失败: ' + (err.message || '未知错误'));
+    }
   };
 
   return (

@@ -12,6 +12,7 @@ const BASE_DIR = process.env.DATA_DIR || '/opt/hl-os/data';
 const OBSIDIAN_DIR = path.join(BASE_DIR, 'obsidian');
 const ORIGINALS_DIR = path.join(BASE_DIR, 'originals');
 const METADATA_FILE = path.join(BASE_DIR, 'metadata.json');
+const COVERS_DIR = path.join(OBSIDIAN_DIR, 'covers'); // 封面存储在 Obsidian 仓库内以便引用
 
 // 目录映射
 const DIR_MAP = {
@@ -32,6 +33,8 @@ export async function ensureDirectoryStructure(): Promise<void> {
     path.join(OBSIDIAN_DIR, 'Wrong_Problems'),
     path.join(OBSIDIAN_DIR, 'No_Problems'),
     path.join(OBSIDIAN_DIR, 'Courses'),
+    path.join(OBSIDIAN_DIR, 'Books'),
+    COVERS_DIR,
     path.join(ORIGINALS_DIR, 'images'),
     path.join(ORIGINALS_DIR, 'books'),
   ];
@@ -198,25 +201,99 @@ export async function saveObsidianMarkdown(
  * @param fileBuffer - 文件二进制数据
  * @param fileName - 原始文件名
  * @param ownerId - 用户ID
+ * @param subject - 学科 (可选，用于分类)
+ * @param userName - 用户名 (可选，用于分类)
  * @returns 文件路径
  */
 export async function saveBookFile(
   fileBuffer: Buffer,
   fileName: string,
-  ownerId: string
+  ownerId: string,
+  subject: string = '其他',
+  userName: string = 'shared'
 ): Promise<string> {
   await ensureDirectoryStructure();
 
-  // 按月归档: YYYY-MM/
-  const now = new Date();
-  const monthDir = now.toISOString().slice(0, 7); // YYYY-MM
-  const targetDir = path.join(ORIGINALS_DIR, 'books', monthDir);
+  // 策略：originals/books/用户名/学科/
+  const safeSubject = subject.replace(/[/\\?%*:|"<>]/g, '-');
+  const targetDir = path.join(ORIGINALS_DIR, 'books', userName, safeSubject);
 
   await fs.mkdir(targetDir, { recursive: true });
   const filePath = path.join(targetDir, fileName);
 
   await fs.writeFile(filePath, fileBuffer);
 
+  return filePath;
+}
+
+/**
+ * 保存图书封面
+ * @param tempCoverPath - 临时封面路径
+ * @param fileName - 目标文件名
+ * @returns 相对封面路径 (用于前端访问)
+ */
+export async function saveBookCover(
+  tempCoverPath: string,
+  fileName: string
+): Promise<string> {
+  await ensureDirectoryStructure();
+
+  const targetPath = path.join(COVERS_DIR, fileName);
+  await fs.copyFile(tempCoverPath, targetPath);
+
+  // 返回文件名，由调用方决定如何构建路径（Web URL 或 Obsidian 相对路径）
+  return fileName;
+}
+
+/**
+ * 保存图书 Markdown
+ * @param metadata - 图书元数据
+ * @param content - Markdown 内容
+ * @param ownerId - 用户ID
+ * @param userName - 用户名
+ * @returns 文件路径
+ */
+export async function saveBookMarkdown(
+  metadata: any,
+  content: string,
+  ownerId: string,
+  userName: string
+): Promise<string> {
+  await ensureDirectoryStructure();
+
+  const { title, subject, category, tags, coverImage } = metadata;
+  
+  const safeSubject = (subject || '其他').replace(/[/\\?%*:|"<>]/g, '-');
+  const safeTitle = title.replace(/[/\\?%*:|"<>]/g, '-');
+  const mdFileName = `${safeTitle}.md`;
+  
+  // 路径: obsidian/Books/用户名/学科/
+  const targetDir = path.join(OBSIDIAN_DIR, 'Books', userName, safeSubject);
+  
+  await fs.mkdir(targetDir, { recursive: true });
+  const filePath = path.join(targetDir, mdFileName);
+
+  // 构建 Frontmatter
+  const frontmatter = `---
+title: ${title}
+author: ${metadata.author || ''}
+subject: ${subject}
+category: ${category}
+grade: ${metadata.grade}
+publisher: ${metadata.publisher || ''}
+publishDate: ${metadata.publishDate || ''}
+tags: [${tags ? tags.join(', ') : ''}]
+cover: ${coverImage || ''}
+created: ${new Date().toISOString()}
+owner: ${ownerId}
+---
+
+# ${title}
+
+${content}
+`;
+
+  await fs.writeFile(filePath, frontmatter, 'utf-8');
   return filePath;
 }
 
