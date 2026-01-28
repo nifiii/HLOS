@@ -110,9 +110,16 @@ router.post('/save-book', upload.none(), async (req: Request, res: Response) => 
     let contentText = '';
     const ext = path.extname(fileName).toLowerCase();
     
+    console.log(`[saveBook] 解析文件内容 (格式: ${ext})...`);
     if (ext === '.pdf') {
-      const result = await parsePDF(fileBuffer);
-      contentText = result.content;
+      try {
+        const result = await parsePDF(fileBuffer);
+        contentText = result.content;
+        console.log(`[saveBook] PDF 解析成功，内容长度: ${contentText.length}`);
+      } catch (parseError) {
+        console.error('[saveBook] PDF 解析失败:', parseError);
+        throw new Error('PDF 解析失败，无法生成内容');
+      }
     } else if (ext === '.epub') {
       const result = await parseEPUB(fileBuffer);
       contentText = JSON.stringify(result);
@@ -120,7 +127,9 @@ router.post('/save-book', upload.none(), async (req: Request, res: Response) => 
       contentText = fileBuffer.toString('utf-8');
     }
 
+    console.log('[saveBook] 调用 LLM 转换为 Markdown...');
     const markdownContent = await convertToMarkdown(contentText);
+    console.log('[saveBook] Markdown 转换完成');
 
     // 5. 保存 Obsidian Markdown 文件
     // 更新 metadata 中的 coverImage 路径 (使用 Obsidian 格式)
