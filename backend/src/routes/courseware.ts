@@ -80,8 +80,4 @@ router.post('/generate-courseware', async (req: Request, res: Response, next: Ne
   }
 });
 
-// TODO: 新版课件生成接口（整合 AnythingLLM）
-// POST /api/generate-courseware-v2
-// 将在阶段3实现
-
 export default router;

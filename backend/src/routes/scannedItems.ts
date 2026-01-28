@@ -91,7 +91,6 @@ router.get('/scanned-items/:id', async (req: Request, res: Response, next: NextF
       timestamp: metadata.timestamp,
       mdPath: metadata.mdPath,
       imagePath: metadata.imagePath,
-      anythingLlmDocId: metadata.anythingLlmDocId,
       markdown,
       meta: {
         type: metadata.type,

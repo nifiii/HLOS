@@ -84,10 +84,6 @@ export interface EBook {
 
   // 章节目录（AI提取）
   tableOfContents: ChapterNode[];
-
-  // AnythingLLM 状态
-  indexStatus: IndexStatus;
-  anythingLlmDocId?: string;
 }
 
 export interface StructuredMetaData {

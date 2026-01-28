@@ -47,7 +47,6 @@ router.get('/books', async (req: Request, res: Response, next: NextFunction) => 
           fileSize,
           pageCount,
           subject: meta.subject,
-          anythingLlmDocId: meta.anythingLlmDocId,
           status: (meta as any).status || 'completed',
           // 元数据 (从数据库读取真实字段)
           metadata: {
@@ -116,7 +115,6 @@ router.get('/books/:id', async (req: Request, res: Response, next: NextFunction)
       uploadedAt: metadata.timestamp,
       filePath: metadata.filePath,
       fileSize,
-      anythingLlmDocId: metadata.anythingLlmDocId,
       status: (metadata as any).status || 'completed',
       metadata: {
         title: (metadata as any).title || `${metadata.subject}教材`,

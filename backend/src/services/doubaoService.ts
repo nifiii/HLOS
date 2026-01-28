@@ -91,15 +91,18 @@ export async function convertToMarkdownWithDoubao(
   try {
     const { client, model } = getDoubaoClient();
 
-    // 由于 Token 限制，这里可能需要分段处理， MVP 版本先处理前 30k 字符
-    // 生产环境建议实现分块处理逻辑
-    const contentSample = text.substring(0, 30000); 
+    // 尝试处理更长的文本 (例如前 100,000 字符)，豆包部分模型支持长上下文
+    // 如果 text 较短，则取全文
+    const MAX_CHARS = 100000;
+    const contentSample = text.length > MAX_CHARS ? text.substring(0, MAX_CHARS) : text;
+
+    console.log(`[Doubao] 正在转换 Markdown, 文本长度: ${contentSample.length}`);
 
     const completion = await client.chat.completions.create({
       messages: [
         { 
           role: 'system', 
-          content: '你是一个文档排版专家。请将用户输入的文本重写为结构清晰、排版精美的 Markdown 格式。保留所有标题层级、列表、表格和数学公式（使用 LaTeX）。不要省略任何内容。' 
+          content: '你是一个专业的文档排版专家。请将用户提供的 PDF 提取文本重写为结构清晰、排版精美的 Markdown 格式。要求：\n1. 保留所有标题层级 (# ## ###)。\n2. 使用标准列表格式。\n3. 数学公式必须使用 LaTeX 格式 (例如 $...$ 或 $$...$$)。\n4. 保持原文逻辑，不要省略重要内容。\n5. 不要包含任何开场白或结束语，直接返回 Markdown 内容。' 
         },
         { role: 'user', content: contentSample }
       ],
@@ -110,6 +113,6 @@ export async function convertToMarkdownWithDoubao(
     return completion.choices[0].message.content || '';
   } catch (error) {
     console.error('Doubao Markdown 转换失败:', error);
-    throw error; // 让上层处理错误或降级
+    throw error;
   }
 }

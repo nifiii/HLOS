@@ -1,5 +1,4 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import fetch from 'node-fetch';
 import {
   saveOriginalImage,
   saveObsidianMarkdown,
@@ -7,9 +6,6 @@ import {
 } from '../services/fileStorage.js';
 
 const router = Router();
-
-const ANYTHINGLLM_BASE_URL = process.env.ANYTHINGLLM_ENDPOINT || 'http://localhost:3001';
-const ANYTHINGLLM_API_KEY = process.env.ANYTHINGLLM_API_KEY;
 
 // 用户名映射
 const USER_NAMES: Record<string, string> = {
@@ -20,7 +16,7 @@ const USER_NAMES: Record<string, string> = {
 
 /**
  * POST /api/save-scanned-item
- * 保存扫描项到文件系统并索引到 AnythingLLM
+ * 保存扫描项到文件系统
  */
 router.post('/save-scanned-item', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -58,19 +54,11 @@ router.post('/save-scanned-item', async (req: Request, res: Response, next: Next
     });
     console.log(`[saveScannedItem] 元数据索引已更新`);
 
-    // 4. 推送到 AnythingLLM（异步，不阻塞响应）
-    if (ANYTHINGLLM_API_KEY) {
-      indexToAnythingLLM(scannedItem, mdPath, imagePath).catch(error => {
-        console.error('[saveScannedItem] AnythingLLM索引失败:', error);
-      });
-    }
-
     return res.json({
       success: true,
       data: {
         mdPath,
         imagePath,
-        anythingLlmDocId: null, // 稍后异步更新
       }
     });
 
@@ -79,93 +67,5 @@ router.post('/save-scanned-item', async (req: Request, res: Response, next: Next
     next(error);
   }
 });
-
-/**
- * 异步索引到 AnythingLLM
- */
-async function indexToAnythingLLM(
-  scannedItem: any,
-  mdPath: string,
-  imagePath: string
-): Promise<void> {
-  try {
-    // 构造完整 Markdown（含 Frontmatter）
-    const markdown = `---
-type: ${scannedItem.meta.type}
-subject: ${scannedItem.meta.subject}
-chapter: ${scannedItem.meta.chapter_hint || ''}
-knowledge_status: ${scannedItem.meta.knowledge_status}
-owner: ${scannedItem.ownerId}
-created: ${new Date(scannedItem.timestamp).toISOString()}
-mdPath: ${mdPath}
-imagePath: ${imagePath}
-problems_count: ${scannedItem.meta.problems?.length || 0}
----
-
-# ${scannedItem.meta.subject} - ${scannedItem.meta.chapter_hint || '综合'}
-
-${scannedItem.rawMarkdown}
-
-## 题目详情
-
-${scannedItem.meta.problems?.map((p: any, idx: number) => `
-### 题目 ${idx + 1}
-
-**原题：** ${p.content}
-**学生答案：** ${p.studentAnswer || '未作答'}
-**批改：** ${p.teacherComment || '无'}
-**状态：** ${p.status}
-`).join('\n')}
-`;
-
-    const response = await fetch(`${ANYTHINGLLM_BASE_URL}/api/v1/document/upload`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${ANYTHINGLLM_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        textContent: markdown,
-        metadata: {
-          source: 'scanned_item',
-          itemId: scannedItem.id,
-          ownerId: scannedItem.ownerId,
-          subject: scannedItem.meta.subject,
-          chapter: scannedItem.meta.chapter_hint,
-          type: scannedItem.meta.type,
-          status: scannedItem.meta.knowledge_status,
-          mdPath,
-          imagePath,
-          hasWrongProblems: scannedItem.meta.problems?.some((p: any) => p.status === 'WRONG')
-        }
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`AnythingLLM API error: ${response.statusText}`);
-    }
-
-    const result: any = await response.json();
-    console.log(`[indexToAnythingLLM] 索引成功: ${result.documentId || result.id}`);
-
-    // 更新元数据索引（添加 anythingLlmDocId）
-    await updateMetadataIndex({
-      id: scannedItem.id,
-      type: scannedItem.meta.type,
-      ownerId: scannedItem.ownerId,
-      userName: USER_NAMES[scannedItem.ownerId] || '未知',
-      subject: scannedItem.meta.subject,
-      chapter: scannedItem.meta.chapter_hint,
-      timestamp: scannedItem.timestamp,
-      mdPath,
-      imagePath,
-      anythingLlmDocId: result.documentId || result.id,
-    });
-
-  } catch (error) {
-    console.error('[indexToAnythingLLM] 失败:', error);
-    throw error;
-  }
-}
 
 export default router;

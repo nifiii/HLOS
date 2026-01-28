@@ -180,7 +180,7 @@ const CaptureModule: React.FC<CaptureModuleProps> = ({ onScanComplete, currentUs
         setIsSaving(true);
         setSaveError(null);
 
-        // 1. 保存到服务器（文件系统 + AnythingLLM）
+        // 1. 保存到服务器（文件系统 + 数据库）
         const paths = await saveScannedItemToServer(reviewItem, preview);
 
         // 2. 更新文件路径到数据

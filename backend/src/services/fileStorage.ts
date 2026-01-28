@@ -386,7 +386,6 @@ interface MetadataEntry {
   mdPath?: string;
   imagePath?: string;
   filePath?: string; // 用于教材文件
-  anythingLlmDocId?: string;
 }
 
 /**
@@ -402,11 +401,11 @@ export async function updateMetadataIndex(entry: MetadataEntry): Promise<void> {
       INSERT INTO books (
         id, title, author, subject, category, grade, publisher, publishDate, 
         tags, ownerId, userName, filePath, mdPath, coverPath, status, 
-        anythingLlmDocId, timestamp
+        timestamp
       ) VALUES (
         @id, @title, @author, @subject, @category, @grade, @publisher, @publishDate, 
         @tags, @ownerId, @userName, @filePath, @mdPath, @coverPath, @status, 
-        @anythingLlmDocId, @timestamp
+        @timestamp
       )
       ON CONFLICT(id) DO UPDATE SET
         title=excluded.title,
@@ -423,7 +422,6 @@ export async function updateMetadataIndex(entry: MetadataEntry): Promise<void> {
         mdPath=excluded.mdPath,
         coverPath=excluded.coverPath,
         status=excluded.status,
-        anythingLlmDocId=excluded.anythingLlmDocId,
         timestamp=excluded.timestamp
     `);
 
@@ -483,7 +481,7 @@ export async function queryMetadata(filters: {
     const params: any = {};
 
     if (filters.ownerId) {
-      query += ' AND (ownerId = @ownerId OR ownerId = "shared")';
+      query += " AND (ownerId = @ownerId OR ownerId = 'shared')";
       params.ownerId = filters.ownerId;
     }
     if (filters.subject) {

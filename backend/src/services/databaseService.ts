@@ -36,7 +36,6 @@ export function initDatabase() {
       mdPath TEXT,
       coverPath TEXT,
       status TEXT DEFAULT 'pending', -- pending, processing, completed, failed
-      anythingLlmDocId TEXT,
       timestamp INTEGER
     )
   `);
