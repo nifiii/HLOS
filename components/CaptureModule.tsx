@@ -349,16 +349,6 @@ const CaptureModule: React.FC<CaptureModuleProps> = ({ onScanComplete, currentUs
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="bg-gradient-to-r from-brand-600 to-indigo-700 rounded-3xl p-6 text-white shadow-2xl relative overflow-hidden">
-         <div className="flex items-center space-x-4 relative z-10">
-            <span className="text-4xl">{currentUser.avatar}</span>
-            <div>
-               <h3 className="text-xl font-black">四层语义解构拍题</h3>
-               <p className="text-brand-100 text-[10px] font-bold uppercase tracking-widest">教育 OCR 科学家模型服务中</p>
-            </div>
-         </div>
-      </div>
-
       {!preview && !isProcessing ? (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
